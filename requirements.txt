@@ -1,0 +1,10 @@
+# 基本的な依存関係
+pytest==7.3.1
+pydantic==1.10.8
+email-validator==2.0.0
+
+# Neo4j関連
+neo4j==5.8.1
+
+# ChromaDB関連（将来的に必要になる可能性があるため）
+chromadb==0.4.6
