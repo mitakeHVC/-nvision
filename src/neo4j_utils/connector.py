@@ -40,7 +40,7 @@ class Neo4jConnector:
         try:
             self._driver = GraphDatabase.driver(db_uri, auth=(db_username, db_password))
             # Verify connection by trying to fetch server info or a simple query
-            self._driver.verify_connectivity() 
+            self._driver.verify_connectivity()
             print(f"Successfully connected to Neo4j at {db_uri}")
         except ServiceUnavailable as e:
             print(f"Error: Could not connect to Neo4j at {db_uri}. Details: {e}")
@@ -87,7 +87,7 @@ class Neo4jConnector:
 
         records = []
         summary = None
-        
+
         session_params = {}
         if db:
             session_params['database'] = db
@@ -104,10 +104,10 @@ class Neo4jConnector:
                     )
                 else:
                     raise ValueError(f"Invalid tx_type: {tx_type}. Must be 'read' or 'write'.")
-                
+
                 # Process results if any
                 if result: # result from _run_transaction_function is the list of records
-                    records = result 
+                    records = result
                 # Accessing summary might be different if we want it from the Result object
                 # For now, _run_transaction_function returns the list of records directly.
                 # If you need detailed summary (counters, etc.), the transaction function would need to return the Result object
@@ -119,14 +119,14 @@ class Neo4jConnector:
         except Neo4jError as e:
             print(f"Neo4j error executing query: {query}\nParameters: {parameters}\nError: {e}")
             # Depending on policy, might raise, or return empty/None
-            raise 
+            raise
         except ValueError as e: # For invalid tx_type
             print(f"ValueError: {e}")
             raise
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             raise # Re-raise unexpected errors
-        
+
         return records
 
     @staticmethod
@@ -147,7 +147,7 @@ class Neo4jConnector:
 # Conceptual Example Usage (typically in another script)
 if __name__ == "__main__":
     print("Attempting to connect to Neo4j using Neo4jConnector...")
-    
+
     # Ensure Neo4j is running and accessible with credentials (defaults or from ENV)
     # For this example to run, you might need a local Neo4j instance.
     # E.g., docker run --rm -p 7687:7687 -p 7474:7474 -e NEO4J_AUTH=neo4j/password neo4j:latest
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             )
             print("Created or merged Alice.")
             created_nodes +=1
-            
+
             connector.execute_query(
                 "MERGE (p:Person {name: $name}) RETURN p",
                 parameters={"name": "Bob"},
@@ -180,7 +180,7 @@ if __name__ == "__main__":
                     print(f"- Name: {record['name']}, ID: {record['id']}")
             else:
                 print("\nNo people found or error in query.")
-            
+
             # Example: Count nodes (Read transaction)
             count_results = connector.execute_query("MATCH (n) RETURN count(n) AS node_count", tx_type='read')
             if count_results:

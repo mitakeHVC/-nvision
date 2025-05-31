@@ -1,0 +1,8 @@
+OrderID,CustomerID,OrderDate,OrderStatus,OrderTotalAmount,ShippingAddress,BillingAddress,OrderItemID,ProductID,Quantity,UnitPrice
+201,1,2023-03-15 10:00:00,Delivered,1529.49,"123 Elm Street, Anytown, AT 12345","123 Elm Street, Anytown, AT 12345",301,101,1,1499.99
+201,1,2023-03-15 10:00:00,Delivered,1529.49,"123 Elm Street, Anytown, AT 12345","123 Elm Street, Anytown, AT 12345",302,102,1,29.50
+202,2,2023-03-16 11:30:00,Shipped,52.98,"456 Oak Avenue, Otherville, OV 67890","456 Oak Avenue, Otherville, OV 67890",303,103,2,12.99
+202,2,2023-03-16 11:30:00,Shipped,52.98,"456 Oak Avenue, Otherville, OV 67890","456 Oak Avenue, Otherville, OV 67890",304,102,1,27.00
+203,3,2023-03-17 14:15:00,Pending,85.70,"789 Pine Road, Somecity, SC 54321","PO Box 100, Somecity, SC 54322",305,104,1,45.75
+203,3,2023-03-17 14:15:00,Pending,85.70,"789 Pine Road, Somecity, SC 54321","PO Box 100, Somecity, SC 54322",306,105,1,39.95
+204,4,2023-03-18 09:05:00,Delivered,29.50,"321 Maple Drive, Villagetown, VT 11223","321 Maple Drive, Villagetown, VT 11223",307,102,1,29.50

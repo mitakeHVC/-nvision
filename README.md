@@ -1,76 +1,83 @@
 # Project Title: Data Schema and Transformation Implementation
 
-This project aims to implement the data schemas, relationships, and transformation logic outlined in the `data_schema_and_transformation_proposal.md` document.
+This project aims to implement the data schemas, relationships, and transformation logic outlined in the `data_schema_and_transformation_proposal.md` document for E-commerce, CRM, and Shared/Support systems, primarily targeting Neo4j and ChromaDB.
 
-## Current Status
+## Phase 1: E-commerce Data - Completed
 
-- **E-commerce (EC) Data Models:** Python Pydantic models for the EC system entities (Customers, Products, Categories, Orders, OrderItems, Suppliers, CustomerReviews) have been created and are located in `src/data_models/ec_models.py`. These models include basic data validation.
-- **Shared/Support System Data Models:** Pydantic models for Chat (`ChatSession`, `ChatMessage`) are in `src/data_models/shared_models.py`.
-- **CRM System Data Models:** Pydantic models for CRM entities (`Contact`, `Company`, `Interaction`, `Deal`, `User`) are in `src/data_models/crm_models.py`.
-- **Neo4j Schemas:** Conceptual Cypher schemas (nodes, relationships, constraints, indexes) for EC, CRM, and Shared systems are defined in `src/neo4j_setup/`.
-- **Neo4j Connector:** A utility module `src/neo4j_utils/connector.py` for managing Neo4j connections is available.
-- **Sample Data:** Sample product data is available in `data/sample_products.csv`.
-- **Product Ingestion Script:** A script `src/ingestion/ingest_products.py` can read, validate, and load product data from CSV into Neo4j.
-- **Unit & Integration Tests:** Tests for data models and the product ingestion script are in the `tests/` directory.
-- **Design Documents:**
-    - `data_schema_and_transformation_proposal.md`
-    - `docs/data_ingestion_framework.md`
+This phase focused on establishing the foundational elements for E-commerce data.
 
-## Data Ingestion
+**Key Accomplishments:**
+-   **Data Models (`src/data_models/ec_models.py`):**
+    -   Pydantic models created for `Customer`, `Product`, `Category`, `Order`, `OrderItem` (as relationship properties), `Supplier`, and `CustomerReview`.
+    -   Includes data validation rules (e.g., `PositiveInt`, `EmailStr`, field constraints).
+-   **Neo4j Schema (`src/neo4j_setup/ec_schema.cypher`):**
+    -   Conceptual Cypher schema defining node labels (`ECCustomer`, `Product`, `Category`, `Order`, `Supplier`, `Review`), their properties, relationships (`PLACED`, `CONTAINS`, `BELONGS_TO`, `SUPPLIED_BY`, `WROTE_REVIEW`, `HAS_REVIEW`), and actual statements for unique constraints and indexes.
+-   **Neo4j Connector (`src/neo4j_utils/connector.py`):**
+    -   A reusable Python module using the official `neo4j` driver to manage database connections and execute Cypher queries, configurable via environment variables.
+-   **Sample Data (`data/` directory):**
+    -   `sample_products.csv`
+    -   `sample_customers.csv`
+    -   `sample_orders.csv` (includes order item data)
+    -   `sample_suppliers.csv`
+    -   `sample_reviews.csv`
+-   **Ingestion Scripts (`src/ingestion/` directory):**
+    -   Python scripts developed for each E-commerce entity to read data from its respective CSV file, validate it using Pydantic models, and load it into Neo4j (including nodes and relationships).
+        -   `ingest_products.py`
+        -   `ingest_customers.py`
+        -   `ingest_orders.py`
+        -   `ingest_suppliers.py`
+        -   `ingest_reviews.py`
+-   **Testing (`tests/` directory):**
+    -   Comprehensive unit and integration tests (`pytest`) for all Pydantic data models and each of the E-commerce ingestion scripts, ensuring data validation logic and Neo4j interactions function correctly.
+-   **Design Documents:**
+    -   `data_schema_and_transformation_proposal.md`: The core proposal document.
+    -   `docs/data_ingestion_framework.md`: Conceptual design for the overall data ingestion framework.
 
-This section describes scripts and processes for ingesting data into the target systems (Neo4j, ChromaDB).
+**Shared & CRM Foundational Models (Also part of initial setup):**
+- **Shared/Support System Data Models (`src/data_models/shared_models.py`):** Pydantic models for `ChatSession`, `ChatMessage`.
+- **CRM System Data Models (`src/data_models/crm_models.py`):** Pydantic models for `Contact`, `Company`, `Interaction`, `Deal`, `User`.
+- **Neo4j Schemas (`src/neo4j_setup/crm_shared_schema.cypher`):** Conceptual Cypher schema for CRM & Shared system nodes, relationships, constraints, and indexes.
+
+
+## Data Ingestion Scripts
+
+This section describes specific scripts for ingesting data into Neo4j. Common dependencies include `neo4j` and `pydantic`. Neo4j connection is configured via `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` environment variables (defaults: `bolt://localhost:7687`, `neo4j`, `password`).
 
 ### Product Ingestion Script (`src/ingestion/ingest_products.py`)
+-   **Purpose:** Ingests product and category data from `data/sample_products.csv`. Creates/merges `Product` and `Category` nodes and `BELONGS_TO` relationships.
+-   **Run:** `python -m src.ingestion.ingest_products`
+-   **Input:** `data/sample_products.csv`
 
-**1. Purpose:**
-This script is responsible for ingesting product data from a sample CSV file (`data/sample_products.csv`). It performs the following actions:
-- Reads product and associated category information from each row in the CSV.
-- Validates the data against the `Product` and `Category` Pydantic models (defined in `src/data_models/ec_models.py`).
-- Logs validation successes and errors.
-- If validation is successful and a Neo4j connection is available, it loads the data into a Neo4j database by:
-    - Creating or merging `Product` nodes.
-    - Creating or merging `Category` nodes.
-    - Establishing `BELONGS_TO` relationships between `Product` and `Category` nodes.
+### Customer Ingestion Script (`src/ingestion/ingest_customers.py`)
+-   **Purpose:** Ingests customer data from `data/sample_customers.csv`. Creates/merges `ECCustomer` nodes.
+-   **Run:** `python -m src.ingestion.ingest_customers`
+-   **Input:** `data/sample_customers.csv`
 
-**2. Dependencies:**
-The script requires the following Python libraries:
-- `neo4j` (official Neo4j Python driver)
-- `pydantic` (for data validation)
+### Order Ingestion Script (`src/ingestion/ingest_orders.py`)
+-   **Purpose:** Ingests order and order item data from `data/sample_orders.csv`. Creates/merges `Order` nodes, `PLACED` relationships from `ECCustomer` to `Order`, and `CONTAINS` relationships from `Order` to `Product` (with item properties like quantity and unit price).
+-   **Run:** `python -m src.ingestion.ingest_orders`
+-   **Input:** `data/sample_orders.csv`
 
-These dependencies should ideally be listed in a `requirements.txt` file for the project.
+### Supplier Ingestion Script (`src/ingestion/ingest_suppliers.py`)
+-   **Purpose:** Ingests supplier data from `data/sample_suppliers.csv`. Creates/merges `Supplier` nodes.
+-   **Run:** `python -m src.ingestion.ingest_suppliers`
+-   **Input:** `data/sample_suppliers.csv`
 
-**3. Configuration:**
-Neo4j database connection parameters are configured via environment variables. If these variables are not set, the script uses default values suitable for a local Neo4j instance.
-- `NEO4J_URI`: The Bolt URI for the Neo4j database.
-    - Default: `bolt://localhost:7687`
-- `NEO4J_USERNAME`: The username for Neo4j authentication.
-    - Default: `neo4j`
-- `NEO4J_PASSWORD`: The password for Neo4j authentication.
-    - Default: `password`
+### Customer Review Ingestion Script (`src/ingestion/ingest_reviews.py`)
+-   **Purpose:** Ingests customer review data from `data/sample_reviews.csv`. Creates/merges `Review` nodes, `WROTE_REVIEW` relationships from `ECCustomer` to `Review`, and `HAS_REVIEW` relationships from `Product` to `Review`.
+-   **Run:** `python -m src.ingestion.ingest_reviews`
+-   **Input:** `data/sample_reviews.csv`
 
-**4. Running the Script:**
-To run the script from the root directory of this repository, use the following command:
-```bash
-python -m src.ingestion.ingest_products
-```
-When executed, the script will:
-- Attempt to connect to the Neo4j database using the configured parameters.
-- Read product data from `data/sample_products.csv`.
-- Validate each product and its associated category.
-- Log validation results.
-- If Neo4j is connected, load valid data into the database.
-- Print a summary of processing, including counts of processed rows, validated items, loaded items, and any errors encountered.
-- If Neo4j is unavailable, the script will still perform CSV reading and validation but will skip the data loading steps.
+## Next Steps: Phase 2 - CRM & Shared Systems Data Ingestion
 
-**5. Input Data:**
-The script expects the input data in CSV format. A sample input file is provided at:
-`data/sample_products.csv`
-
-The CSV file should include headers such as `ProductID`, `ProductName`, `ProductDescription`, `SKU`, `CategoryID`, `CategoryName`, `SupplierID`, `Price`, `StockQuantity`, `ImagePath`, and `DateAdded`.
-
-## Next Steps
-
-The project will proceed with:
-- Development of data ingestion scripts for CRM and Shared/Support systems.
-- Implementation of ChromaDB vector embedding strategies and data ingestion logic.
-- Enhancements to error handling, monitoring, and orchestration of ingestion pipelines.
+The project will now proceed with:
+-   **Development of data ingestion scripts for CRM system entities:**
+    -   `Contact`, `Company`, `Interaction`, `Deal`, `User`.
+    -   This includes creating/merging nodes and establishing defined relationships within the CRM context (e.g., `WORKS_FOR`, `PARTICIPATED_IN`).
+-   **Development of data ingestion scripts for Shared/Support system entities (Chat):**
+    -   `ChatSession`, `ChatMessage`.
+    -   Includes node creation and relationships like `HAS_MESSAGE`, `PARTICIPATED_IN_CHAT`.
+-   **Cross-System Relationship Implementation:** Focus on creating relationships that link entities across different domains (e.g., `EC_CUSTOMER --IS_SAME_AS--> CRM_CONTACT`).
+-   **ChromaDB Integration:** Begin implementation of vector embedding strategies (as outlined in `data_schema_and_transformation_proposal.md`) and data ingestion logic for ChromaDB using relevant text fields from all systems.
+-   **Testing:** Continue to develop unit and integration tests for all new ingestion scripts and components.
+-   **Refinement:** Enhance error handling, monitoring, and explore orchestration options for the ingestion pipelines as complexity grows.

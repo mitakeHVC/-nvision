@@ -49,7 +49,7 @@ CSV_HEADERS = ["ProductID","ProductName","ProductDescription","SKU","CategoryID"
 def test_process_valid_csv_data_no_neo4j(mocker, caplog):
     """Test processing a CSV with valid data, without Neo4j interaction."""
     caplog.set_level(logging.INFO)
-    
+
     csv_rows = [
         {"ProductID":"1","ProductName":"Laptop","ProductDescription":"Desc1","SKU":"SKU001","CategoryID":"10","CategoryName":"Electronics","SupplierID":"100","Price":"1200.99","StockQuantity":"50","ImagePath":"/img1.jpg","DateAdded":"2023-01-01 10:00:00"},
         {"ProductID":"2","ProductName":"Mouse","ProductDescription":"Desc2","SKU":"SKU002","CategoryID":"10","CategoryName":"Electronics","SupplierID":"101","Price":"25.50","StockQuantity":"100","ImagePath":"/img2.jpg","DateAdded":"2023-01-15 12:00:00"},
@@ -86,11 +86,11 @@ def test_process_csv_with_pydantic_validation_errors(mocker, caplog):
     assert summary["validated_products_count"] == 1 # Only the first one
     assert summary["validated_categories_count"] == 1 # Only from the first one
     assert summary["validation_errors"] == 2
-    assert "Validation error" in caplog.text 
+    assert "Validation error" in caplog.text
 
 def test_process_csv_with_type_conversion_warnings(mocker, caplog): # Renamed test for clarity
     """Test CSV processing logs warnings for data that causes type conversion issues but might still be valid if optional."""
-    caplog.set_level(logging.WARNING) 
+    caplog.set_level(logging.WARNING)
     csv_rows = [
         # This row will have Price, StockQuantity, DateAdded become None after parsing warnings
         {"ProductID":"2","ProductName":"Fan","ProductDescription":"Desc2","SKU":"SKU002","CategoryID":"10","CategoryName":"Electronics","SupplierID":"101","Price":"not_a_float","StockQuantity":"many","ImagePath":"/img2.jpg","DateAdded":"not_a_date"},
@@ -99,7 +99,7 @@ def test_process_csv_with_type_conversion_warnings(mocker, caplog): # Renamed te
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
     summary = process_products_csv("dummy_path.csv", connector=None)
-    
+
     assert summary["processed_rows"] == 1
     assert summary["validated_products_count"] == 1 # ProductID 2 is valid, other fields become None
     assert summary["validated_categories_count"] == 1 # Category 10 is valid
@@ -116,10 +116,10 @@ def test_process_csv_required_field_unparsable(mocker, caplog):
     ]
     mock_csv_file_2 = create_csv_mock_content(CSV_HEADERS, csv_rows_required_fail)
     mocker.patch('builtins.open', return_value=mock_csv_file_2)
-    
+
     summary_2 = process_products_csv("dummy_path2.csv", connector=None)
     assert summary_2["validation_errors"] == 1 # ProductID validation fails as it's None
-    assert "Validation error" in caplog.text 
+    assert "Validation error" in caplog.text
 
 def test_process_empty_csv(mocker, caplog):
     """Test processing an empty CSV file (only headers)."""
@@ -138,7 +138,7 @@ def test_process_csv_file_not_found(mocker, caplog):
     """Test processing when the CSV file is not found."""
     caplog.set_level(logging.ERROR)
     mocker.patch('builtins.open', side_effect=FileNotFoundError("File not found"))
-    
+
     summary = process_products_csv("non_existent_path.csv", connector=None)
     assert summary["status"] == "Failed"
     assert "File not found" in summary["message"]
@@ -147,7 +147,7 @@ def test_process_csv_file_not_found(mocker, caplog):
 def test_process_valid_csv_data_with_mocked_neo4j_calls(mocker, caplog):
     """Test that Neo4j methods are called correctly with valid data."""
     caplog.set_level(logging.INFO)
-    
+
     csv_rows = [
         {"ProductID":"1","ProductName":"Laptop","ProductDescription":"Desc1","SKU":"SKU001","CategoryID":"10","CategoryName":"Electronics","SupplierID":"100","Price":"1200.99","StockQuantity":"50","ImagePath":"/img1.jpg","DateAdded":"2023-01-01 10:00:00"},
     ]
@@ -168,8 +168,8 @@ def test_process_valid_csv_data_with_mocked_neo4j_calls(mocker, caplog):
     assert summary["loaded_categories_count"] == 1
     assert summary["relationships_created_count"] == 1
     assert summary["neo4j_errors"] == 0
-    
-    assert mock_connector_instance.execute_query.call_count == 3 
+
+    assert mock_connector_instance.execute_query.call_count == 3
 
     args_cat, kwargs_cat = mock_connector_instance.execute_query.call_args_list[0]
     assert "MERGE (c:Category {categoryID: $categoryID})" in args_cat[0]
@@ -206,12 +206,12 @@ def test_process_csv_with_neo4j_errors(mocker, caplog):
     summary = process_products_csv("dummy_path.csv", connector=mock_connector_instance)
 
     assert summary["processed_rows"] == 1
-    assert summary["validated_products_count"] == 1 
+    assert summary["validated_products_count"] == 1
     assert summary["validated_categories_count"] == 1
     assert summary["loaded_products_count"] == 0
     assert summary["loaded_categories_count"] == 0
     assert summary["relationships_created_count"] == 0
-    assert summary["neo4j_errors"] == 1 
+    assert summary["neo4j_errors"] == 1
     assert "Neo4j error merging Category 10" in caplog.text
     assert mock_connector_instance.execute_query.call_count == 1
 
@@ -226,7 +226,7 @@ def neo4j_driver_instance():
     connector = None
     try:
         # Attempt to create a connector instance. If Neo4j is not running, this will fail.
-        connector = Neo4jConnector() 
+        connector = Neo4jConnector()
         # Verify connectivity with a simple query
         connector.execute_query("RETURN 1", tx_type='read')
         logging.info("Neo4jConnector initialized successfully for integration tests.")
@@ -245,7 +245,7 @@ def neo4j_driver_instance():
                 # This example deletes nodes with specific ProductIDs/CategoryIDs used in these tests.
                 cleanup_product_ids = [901, 902, 903, 950]
                 cleanup_category_ids = [801, 802, 999]
-                
+
                 # Detach delete products by specific IDs
                 if cleanup_product_ids:
                     connector.execute_query(
@@ -272,7 +272,7 @@ def test_ingest_products_full_pipeline_neo4j(neo4j_driver_instance, tmp_path, ca
     Uses a temporary CSV file.
     """
     caplog.set_level(logging.INFO)
-    connector = neo4j_driver_instance 
+    connector = neo4j_driver_instance
 
     csv_headers = CSV_HEADERS
     csv_rows_data = [
@@ -280,7 +280,7 @@ def test_ingest_products_full_pipeline_neo4j(neo4j_driver_instance, tmp_path, ca
         {"ProductID":"902","ProductName":"Integration Mouse","ProductDescription":"Test Desc 2","SKU":"INT-MS-01","CategoryID":"801","CategoryName":"Integration Elec","SupplierID":"702","Price":"50.00","StockQuantity":"20","ImagePath":"/int/img2.jpg","DateAdded":"2023-05-02 11:00:00"},
         {"ProductID":"903","ProductName":"Integration Book","ProductDescription":"Test Desc 3","SKU":"INT-BK-01","CategoryID":"802","CategoryName":"Integration Books","SupplierID":"703","Price":"30.00","StockQuantity":"5","ImagePath":"/int/img3.jpg","DateAdded":"2023-05-03 12:00:00"},
     ]
-    
+
     temp_csv_file = tmp_path / "integration_sample_products.csv"
     with open(temp_csv_file, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=csv_headers)
@@ -293,29 +293,29 @@ def test_ingest_products_full_pipeline_neo4j(neo4j_driver_instance, tmp_path, ca
     assert summary["status"] == "Completed"
     assert summary["processed_rows"] == 3
     assert summary["validated_products_count"] == 3
-    assert summary["validated_categories_count"] == 3 
+    assert summary["validated_categories_count"] == 3
     assert summary["loaded_products_count"] == 3
-    assert summary["loaded_categories_count"] == 3 
+    assert summary["loaded_categories_count"] == 3
     assert summary["relationships_created_count"] == 3
     assert summary["neo4j_errors"] == 0
 
     prod901 = connector.execute_query("MATCH (p:Product {productID: 901}) RETURN p.productName as name, p.Price as price", tx_type='read')
     assert len(prod901) == 1 and prod901[0]["name"] == "Integration Laptop" and prod901[0]["price"] == 1500.00
-    
+
     cat801 = connector.execute_query("MATCH (c:Category {categoryID: 801}) RETURN c.categoryName as name", tx_type='read')
     assert len(cat801) == 1 and cat801[0]["name"] == "Integration Elec"
 
     rel1 = connector.execute_query("MATCH (p:Product {productID: 901})-[r:BELONGS_TO]->(c:Category {categoryID: 801}) RETURN type(r) as rel_type", tx_type='read')
     assert len(rel1) == 1 and rel1[0]["rel_type"] == "BELONGS_TO"
-    
+
     # Idempotency check
     logging.info("Running ingestion script again for idempotency check...")
     summary_idem = process_products_csv(str(temp_csv_file), connector)
     assert summary_idem["loaded_products_count"] == 3 and summary_idem["loaded_categories_count"] == 3 and summary_idem["relationships_created_count"] == 3
-    
+
     total_products = connector.execute_query("MATCH (p:Product) WHERE p.productID IN [901, 902, 903] RETURN count(p) as count", tx_type='read')
     assert total_products[0]["count"] == 3
-    
+
     total_categories = connector.execute_query("MATCH (c:Category) WHERE c.categoryID IN [801, 802] RETURN count(c) as count", tx_type='read')
     assert total_categories[0]["count"] == 2
 
@@ -352,13 +352,13 @@ def test_ingest_product_linking_to_existing_category(neo4j_driver_instance, tmp_
 
     prod = connector.execute_query("MATCH (p:Product {productID: 950}) RETURN p.productName as name", tx_type='read')
     assert len(prod) == 1 and prod[0]["name"] == "Product For Existing Cat"
-    
+
     cat_count = connector.execute_query("MATCH (c:Category {categoryID: 999}) RETURN count(c) as count", tx_type='read')
     assert cat_count[0]["count"] == 1
-    
+
     rel = connector.execute_query("MATCH (p:Product {productID: 950})-[r:BELONGS_TO]->(c:Category {categoryID: 999}) RETURN type(r) as rel_type", tx_type='read')
     assert len(rel) == 1 and rel[0]["rel_type"] == "BELONGS_TO"
-    
+
     cat_updated_name = connector.execute_query("MATCH (c:Category {categoryID: 999}) RETURN c.categoryName as name", tx_type='read')
     assert cat_updated_name[0]["name"] == "PreExisting Category For Link Test"
 

@@ -101,7 +101,7 @@ class CustomerReview(BaseModel):
 #         "ReviewID": 1,
 #         "CustomerID":1,
 #         "ProductID":1,
-#         "Rating": 5 
+#         "Rating": 5
 #     }
 #     review = CustomerReview(**review_data)
 #     print(review.json(indent=2))

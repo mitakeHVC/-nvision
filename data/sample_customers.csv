@@ -1,0 +1,6 @@
+CustomerID,FirstName,LastName,Email,PhoneNumber,ShippingAddress,BillingAddress,RegistrationDate,LastLoginDate
+1,John,Doe,john.doe@example.com,555-123-4567,"123 Elm Street, Anytown, AT 12345","123 Elm Street, Anytown, AT 12345",2022-01-15 10:30:00,2023-03-10 14:00:00
+2,Jane,Smith,jane.smith@emailprovider.com,555-987-6543,"456 Oak Avenue, Otherville, OV 67890","456 Oak Avenue, Otherville, OV 67890",2021-11-20 08:15:00,2023-03-11 09:05:00
+3,Alice,Johnson,alice.johnson@domain.net,555-555-5555,"789 Pine Road, Somecity, SC 54321","PO Box 100, Somecity, SC 54322",2022-07-04 16:45:10,2023-02-28 11:20:30
+4,Robert,Brown,bob.brown@internet.com,555-222-3333,"321 Maple Drive, Villagetown, VT 11223","321 Maple Drive, Villagetown, VT 11223",2023-01-10 12:00:00,2023-03-12 08:00:00
+5,Emily,Davis,emily.d@webmail.org,555-444-7777,"654 Cedar Lane, Hamlet HML 33445","654 Cedar Lane, Hamlet HML 33445",2022-05-25 18:05:55,2023-03-09 17:30:15

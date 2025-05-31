@@ -1,0 +1,7 @@
+ReviewID,CustomerID,ProductID,Rating,ReviewText,ReviewDate,SentimentScore,SentimentLabel
+701,1,101,5,"This laptop is a beast! Handles all my development work with ease, and the screen is gorgeous.",2023-01-20 15:00:00,0.92,Positive
+702,2,102,4,"Very comfortable mouse, tracks well. The side buttons are a bit sensitive, but overall great.",2023-02-18 10:30:00,0.78,Positive
+703,3,103,5,"Delicious green tea! The aroma is wonderful and it tastes very fresh. Will buy again.",2023-03-05 12:00:00,0.95,Positive
+704,1,104,3,"The book is comprehensive but some explanations are a bit too academic for a practical guide. Good reference, though.",2023-02-01 17:45:00,0.15,Neutral
+705,4,105,2,"Yoga mat started to show wear and tear after just a few sessions. Expected better durability for the price.",2023-04-10 08:00:00,-0.65,Negative
+706,5,101,4,"Good performance, but battery life could be better. It's decent for the price point.",2023-01-25 11:15:00,0.40,Positive

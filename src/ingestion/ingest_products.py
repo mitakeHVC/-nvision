@@ -96,7 +96,7 @@ def process_products_csv(csv_file_path: str, connector: Optional[Neo4jConnector]
                         'ImagePath': row.get('ImagePath'),
                         'DateAdded': row.get('DateAdded')
                     }
-                    
+
                     product_data_typed = {
                         'ProductID': _parse_int(product_data_raw['ProductID']),
                         'ProductName': product_data_raw['ProductName'],
@@ -124,15 +124,15 @@ def process_products_csv(csv_file_path: str, connector: Optional[Neo4jConnector]
                         category_instance = Category(**category_data_typed)
                         validated_categories_count +=1
                         logging.info(f"{log_prefix} Category validated: {category_instance.CategoryID} - {category_instance.CategoryName}")
-                    
+
                     # Load into Neo4j if connector is provided
                     if connector:
                         # 1. Merge Category Node
                         if category_instance:
                             cat_props = category_instance.model_dump(exclude_none=True)
                             # Ensure categoryID is in props for the SET clause if MERGE is on categoryID only
-                            cat_props['categoryID'] = category_instance.CategoryID 
-                            
+                            cat_props['categoryID'] = category_instance.CategoryID
+
                             query_cat = "MERGE (c:Category {categoryID: $categoryID}) SET c = $props RETURN c.categoryID"
                             params_cat = {"categoryID": category_instance.CategoryID, "props": cat_props}
                             try:
@@ -184,11 +184,11 @@ def process_products_csv(csv_file_path: str, connector: Optional[Neo4jConnector]
                         except Neo4jError as e:
                             logging.error(f"{log_prefix} Neo4j error merging Product {product_instance.ProductID} or its relationship: {e}")
                             neo4j_errors += 1
-                        
+
                 except PydanticValidationError as e:
                     logging.error(f"{log_prefix} Validation error: {e.errors()} for data {dict(row)}")
                     validation_errors += 1
-                except Exception as e: 
+                except Exception as e:
                     logging.error(f"{log_prefix} Unexpected error processing row: {e} for data {dict(row)}", exc_info=True)
                     type_conversion_errors +=1
 
@@ -234,7 +234,7 @@ def process_products_csv(csv_file_path: str, connector: Optional[Neo4jConnector]
 
 if __name__ == "__main__":
     csv_path = "data/sample_products.csv"
-    
+
     import os
     if not os.path.exists(csv_path):
         logging.error(f"Sample CSV file '{csv_path}' not found. Ensure you are in the project root directory or the path is correct.")
