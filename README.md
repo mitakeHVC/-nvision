@@ -1,83 +1,192 @@
-# Project Title: Data Schema and Transformation Implementation
+# Data Schema and Transformation Implementation
 
-This project aims to implement the data schemas, relationships, and transformation logic outlined in the `data_schema_and_transformation_proposal.md` document for E-commerce, CRM, and Shared/Support systems, primarily targeting Neo4j and ChromaDB.
+このプロジェクトは、`data_schema_and_transformation_proposal.md`ドキュメントに概説されているデータスキーマ、関係、変換ロジックを実装することを目的としています。
 
-## Phase 1: E-commerce Data - Completed
+## プロジェクト概要
 
-This phase focused on establishing the foundational elements for E-commerce data.
+このプロジェクトでは、E-commerce（EC）システム、CRMシステム、および共有/サポートシステムのデータモデルを実装し、Neo4jグラフデータベースとChromaDBベクトルデータベースを使用してデータを管理・分析します。
 
-**Key Accomplishments:**
--   **Data Models (`src/data_models/ec_models.py`):**
-    -   Pydantic models created for `Customer`, `Product`, `Category`, `Order`, `OrderItem` (as relationship properties), `Supplier`, and `CustomerReview`.
-    -   Includes data validation rules (e.g., `PositiveInt`, `EmailStr`, field constraints).
--   **Neo4j Schema (`src/neo4j_setup/ec_schema.cypher`):**
-    -   Conceptual Cypher schema defining node labels (`ECCustomer`, `Product`, `Category`, `Order`, `Supplier`, `Review`), their properties, relationships (`PLACED`, `CONTAINS`, `BELONGS_TO`, `SUPPLIED_BY`, `WROTE_REVIEW`, `HAS_REVIEW`), and actual statements for unique constraints and indexes.
--   **Neo4j Connector (`src/neo4j_utils/connector.py`):**
-    -   A reusable Python module using the official `neo4j` driver to manage database connections and execute Cypher queries, configurable via environment variables.
--   **Sample Data (`data/` directory):**
-    -   `sample_products.csv`
-    -   `sample_customers.csv`
-    -   `sample_orders.csv` (includes order item data)
-    -   `sample_suppliers.csv`
-    -   `sample_reviews.csv`
--   **Ingestion Scripts (`src/ingestion/` directory):**
-    -   Python scripts developed for each E-commerce entity to read data from its respective CSV file, validate it using Pydantic models, and load it into Neo4j (including nodes and relationships).
-        -   `ingest_products.py`
-        -   `ingest_customers.py`
-        -   `ingest_orders.py`
-        -   `ingest_suppliers.py`
-        -   `ingest_reviews.py`
--   **Testing (`tests/` directory):**
-    -   Comprehensive unit and integration tests (`pytest`) for all Pydantic data models and each of the E-commerce ingestion scripts, ensuring data validation logic and Neo4j interactions function correctly.
--   **Design Documents:**
-    -   `data_schema_and_transformation_proposal.md`: The core proposal document.
-    -   `docs/data_ingestion_framework.md`: Conceptual design for the overall data ingestion framework.
+## プロジェクト構造
 
-**Shared & CRM Foundational Models (Also part of initial setup):**
-- **Shared/Support System Data Models (`src/data_models/shared_models.py`):** Pydantic models for `ChatSession`, `ChatMessage`.
-- **CRM System Data Models (`src/data_models/crm_models.py`):** Pydantic models for `Contact`, `Company`, `Interaction`, `Deal`, `User`.
-- **Neo4j Schemas (`src/neo4j_setup/crm_shared_schema.cypher`):** Conceptual Cypher schema for CRM & Shared system nodes, relationships, constraints, and indexes.
+```
+.
+├── data_schema_and_transformation_proposal.md  # データスキーマと変換の提案書
+├── src/
+│   ├── data_models/                           # Pydanticデータモデル
+│   │   ├── ec_models.py                       # ECシステムのモデル
+│   │   ├── crm_models.py                      # CRMシステムのモデル
+│   │   └── shared_models.py                   # 共有システムのモデル
+│   └── neo4j_setup/                           # Neo4jスキーマ設定
+│       └── ec_schema.cypher                   # ECシステムのNeo4jスキーマ
+├── tests/                                     # テストディレクトリ
+│   └── data_models/                           # データモデルのテスト
+│       ├── test_ec_models.py                  # ECモデルのテスト
+│       ├── test_crm_models.py                 # CRMモデルのテスト
+│       └── test_shared_models.py              # 共有モデルのテスト
+├── Dockerfile                                 # Dockerコンテナ定義
+├── docker-compose.yml                         # Docker Compose設定
+├── requirements.txt                           # Pythonパッケージ依存関係
+├── run_tests.sh                               # テスト実行スクリプト
+└── setup_neo4j.sh                             # Neo4jセットアップスクリプト
+```
 
+## 現在の状態
 
-## Data Ingestion Scripts
+- **E-commerce (EC) データモデル:** ECシステムのエンティティ（顧客、製品、カテゴリ、注文、注文アイテム、サプライヤ、顧客レビュー）のPython Pydanticモデルが`src/data_models/ec_models.py`に実装されています。
+- **CRM データモデル:** CRMシステムのエンティティ（連絡先、会社、インタラクション、商談、ユーザー）のPython Pydanticモデルが`src/data_models/crm_models.py`に実装されています。
+- **共有/サポートデータモデル:** 共有エンティティ（チャットセッション、チャットメッセージ）のPython Pydanticモデルが`src/data_models/shared_models.py`に実装されています。
+- **Neo4jスキーマ:** E-commerceエンティティの初期Neo4jスキーマが`src/neo4j_setup/ec_schema.cypher`に定義されています。
+- **Dockerサポート:** 開発とテスト用のDockerおよびdocker-compose設定が実装されています。
 
-This section describes specific scripts for ingesting data into Neo4j. Common dependencies include `neo4j` and `pydantic`. Neo4j connection is configured via `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` environment variables (defaults: `bolt://localhost:7687`, `neo4j`, `password`).
+## 使用方法
 
-### Product Ingestion Script (`src/ingestion/ingest_products.py`)
--   **Purpose:** Ingests product and category data from `data/sample_products.csv`. Creates/merges `Product` and `Category` nodes and `BELONGS_TO` relationships.
--   **Run:** `python -m src.ingestion.ingest_products`
--   **Input:** `data/sample_products.csv`
+### 環境構築
 
-### Customer Ingestion Script (`src/ingestion/ingest_customers.py`)
--   **Purpose:** Ingests customer data from `data/sample_customers.csv`. Creates/merges `ECCustomer` nodes.
--   **Run:** `python -m src.ingestion.ingest_customers`
--   **Input:** `data/sample_customers.csv`
+#### Dockerを使用する場合
 
-### Order Ingestion Script (`src/ingestion/ingest_orders.py`)
--   **Purpose:** Ingests order and order item data from `data/sample_orders.csv`. Creates/merges `Order` nodes, `PLACED` relationships from `ECCustomer` to `Order`, and `CONTAINS` relationships from `Order` to `Product` (with item properties like quantity and unit price).
--   **Run:** `python -m src.ingestion.ingest_orders`
--   **Input:** `data/sample_orders.csv`
+1. Dockerとdocker-composeをインストールします
+2. プロジェクトのルートディレクトリで以下のコマンドを実行します：
 
-### Supplier Ingestion Script (`src/ingestion/ingest_suppliers.py`)
--   **Purpose:** Ingests supplier data from `data/sample_suppliers.csv`. Creates/merges `Supplier` nodes.
--   **Run:** `python -m src.ingestion.ingest_suppliers`
--   **Input:** `data/sample_suppliers.csv`
+```bash
+# Dockerイメージをビルド
+docker-compose build
 
-### Customer Review Ingestion Script (`src/ingestion/ingest_reviews.py`)
--   **Purpose:** Ingests customer review data from `data/sample_reviews.csv`. Creates/merges `Review` nodes, `WROTE_REVIEW` relationships from `ECCustomer` to `Review`, and `HAS_REVIEW` relationships from `Product` to `Review`.
--   **Run:** `python -m src.ingestion.ingest_reviews`
--   **Input:** `data/sample_reviews.csv`
+# Neo4jコンテナを起動してスキーマをセットアップ
+./setup_neo4j.sh
+```
 
-## Next Steps: Phase 2 - CRM & Shared Systems Data Ingestion
+#### ローカル環境を使用する場合
 
-The project will now proceed with:
--   **Development of data ingestion scripts for CRM system entities:**
-    -   `Contact`, `Company`, `Interaction`, `Deal`, `User`.
-    -   This includes creating/merging nodes and establishing defined relationships within the CRM context (e.g., `WORKS_FOR`, `PARTICIPATED_IN`).
--   **Development of data ingestion scripts for Shared/Support system entities (Chat):**
-    -   `ChatSession`, `ChatMessage`.
-    -   Includes node creation and relationships like `HAS_MESSAGE`, `PARTICIPATED_IN_CHAT`.
--   **Cross-System Relationship Implementation:** Focus on creating relationships that link entities across different domains (e.g., `EC_CUSTOMER --IS_SAME_AS--> CRM_CONTACT`).
--   **ChromaDB Integration:** Begin implementation of vector embedding strategies (as outlined in `data_schema_and_transformation_proposal.md`) and data ingestion logic for ChromaDB using relevant text fields from all systems.
--   **Testing:** Continue to develop unit and integration tests for all new ingestion scripts and components.
--   **Refinement:** Enhance error handling, monitoring, and explore orchestration options for the ingestion pipelines as complexity grows.
+1. Python 3.9以上をインストールします
+2. 必要なパッケージをインストールします：
+
+```bash
+pip install -r requirements.txt
+```
+
+3. PYTHONPATHを設定します：
+
+```bash
+# Linuxまたは macOS
+export PYTHONPATH=$PWD
+
+# Windows
+set PYTHONPATH=%CD%
+```
+
+### テストの実行
+
+#### Dockerを使用する場合
+
+すべてのテストを実行：
+
+```bash
+./run_tests.sh
+```
+
+特定のテストのみを実行：
+
+```bash
+./run_tests.sh -t ec_models    # ECモデルのテストのみ実行
+./run_tests.sh -t crm_models   # CRMモデルのテストのみ実行
+./run_tests.sh -t shared_models # 共有モデルのテストのみ実行
+```
+
+コンテナを再ビルドしてテストを実行：
+
+```bash
+./run_tests.sh -b
+```
+
+#### ローカル環境を使用する場合
+
+すべてのテストを実行：
+
+```bash
+pytest -v
+```
+
+特定のテストのみを実行：
+
+```bash
+pytest -v tests/data_models/test_ec_models.py
+pytest -v tests/data_models/test_crm_models.py
+pytest -v tests/data_models/test_shared_models.py
+```
+
+### Neo4jスキーマのセットアップ
+
+#### Dockerを使用する場合
+
+```bash
+./setup_neo4j.sh
+```
+
+#### ローカル環境を使用する場合
+
+1. Neo4jをインストールして起動します
+2. 以下のコマンドを実行してスキーマをセットアップします：
+
+```bash
+cat src/neo4j_setup/ec_schema.cypher | cypher-shell -u neo4j -p password
+```
+
+### データモデルの使用例
+
+```python
+from src.data_models.ec_models import Customer, Product, Order
+from datetime import datetime
+
+# 顧客の作成
+customer = Customer(
+    CustomerID=1,
+    FirstName="山田",
+    LastName="太郎",
+    Email="yamada@example.com",
+    RegistrationDate=datetime.now()
+)
+
+# 製品の作成
+product = Product(
+    ProductID=101,
+    ProductName="ノートパソコン",
+    Description="高性能ノートパソコン",
+    Price=120000.0,
+    StockQuantity=10
+)
+
+# 注文の作成
+order = Order(
+    OrderID=1001,
+    CustomerID=customer.CustomerID,
+    OrderDate=datetime.now(),
+    OrderStatus="処理中",
+    TotalAmount=120000.0
+)
+
+# データの検証
+print(customer.json(indent=2))
+print(product.json(indent=2))
+print(order.json(indent=2))
+```
+
+## 次のステップ
+
+プロジェクトは以下の作業を進める予定です：
+- Neo4jデータ取り込みロジックの実装
+- ChromaDBベクトル埋め込み戦略とデータ取り込みロジックの実装
+- データアクセス用APIエンドポイントの開発
+- データ変換パイプラインの構築
+- フロントエンドインターフェースの開発
+
+## 貢献方法
+
+1. このリポジトリをフォークします
+2. 新しいブランチを作成します (`git checkout -b feature/amazing-feature`)
+3. 変更をコミットします (`git commit -m 'Add some amazing feature'`)
+4. ブランチにプッシュします (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成します
+
+## ライセンス
+
+このプロジェクトは社内利用のみを目的としています。
