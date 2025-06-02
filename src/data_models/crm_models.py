@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, PositiveInt, NonNegativeFloat, NonNegativeInt, EmailStr, Field
+from pydantic import BaseModel, PositiveInt, NonNegativeFloat, NonNegativeInt, EmailStr, Field, ConfigDict
 
 class Contact(BaseModel):
     ContactID: PositiveInt = Field(..., alias='ContactID')
@@ -14,8 +14,7 @@ class Contact(BaseModel):
     DateCreated: Optional[datetime] = Field(None, alias='DateCreated')
     LastContactedDate: Optional[datetime] = Field(None, alias='LastContactedDate')
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class Company(BaseModel):
     CompanyID: PositiveInt = Field(..., alias='CompanyID')
@@ -27,8 +26,7 @@ class Company(BaseModel):
     AnnualRevenue: Optional[NonNegativeFloat] = Field(None, alias='AnnualRevenue')
     NumberOfEmployees: Optional[NonNegativeInt] = Field(None, alias='NumberOfEmployees')
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class Interaction(BaseModel):
     InteractionID: PositiveInt = Field(..., alias='InteractionID')
@@ -40,8 +38,7 @@ class Interaction(BaseModel):
     Notes: Optional[str] = Field(None, alias='Notes') # Text content of the interaction
     AssignedToUserID: Optional[PositiveInt] = Field(None, alias='AssignedToUserID') # CRM User, Foreign Key
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class Deal(BaseModel):
     DealID: PositiveInt = Field(..., alias='DealID')
@@ -53,8 +50,7 @@ class Deal(BaseModel):
     ExpectedCloseDate: Optional[datetime] = Field(None, alias='ExpectedCloseDate')
     AssignedToUserID: Optional[PositiveInt] = Field(None, alias='AssignedToUserID') # CRM User, Foreign Key
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class User(BaseModel): # CRM System User/Sales Rep
     UserID: PositiveInt = Field(..., alias='UserID')
@@ -62,8 +58,7 @@ class User(BaseModel): # CRM System User/Sales Rep
     LastName: Optional[str] = Field(None, alias='LastName')
     Email: Optional[EmailStr] = Field(None, alias='Email')
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 # Example Usage (optional, for testing):
 # if __name__ == "__main__":

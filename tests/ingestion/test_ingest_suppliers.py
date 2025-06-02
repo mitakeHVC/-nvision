@@ -75,21 +75,20 @@ def test_process_suppliers_pydantic_validation_errors(mocker, caplog):
 
 def test_process_suppliers_type_conversion_error_supplierid(mocker, caplog):
     """Test CSV data causing type conversion error for SupplierID."""
-    caplog.set_level(logging.ERROR) # Pydantic error because SupplierID becomes None
+    caplog.set_level(logging.WARNING) # Capture parsing warnings
     csv_rows = [
         {"SupplierID":"not-an-int","SupplierName":"Type Error Supplies","ContactPerson":"Mr. String","Email":"string@id.com","PhoneNumber":"555-STR-ID"},
     ]
     mock_csv_file = create_suppliers_csv_mock_content(SUPPLIER_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
+    # The first call to process_suppliers_csv will log the WARNING for parsing
+    # and then an ERROR for Pydantic validation if CustomerID becomes None.
     summary = process_suppliers_csv("dummy_suppliers.csv", connector=None)
+
     assert summary["validation_errors"] == 1 # SupplierID is required, becomes None, Pydantic error
-    assert "Validation error" in caplog.text
-    # Check for the initial parsing warning as well
-    # Need to set caplog level to WARNING for this specific check if it's not already included by ERROR level
-    with caplog.at_level(logging.WARNING):
-         process_suppliers_csv("dummy_suppliers.csv", connector=None) # Re-run or check initial run if warnings are captured
-         assert "Could not parse integer string: 'not-an-int'" in caplog.text
+    assert "Validation error" in caplog.text # Check for Pydantic validation error log
+    assert "Could not parse integer string: 'not-an-int'" in caplog.text # Check for parsing warning
 
 
 def test_process_empty_suppliers_csv(mocker, caplog):
@@ -114,6 +113,9 @@ def test_process_valid_suppliers_with_mocked_neo4j_calls(mocker, mock_neo4j_conn
     mock_csv_file = create_suppliers_csv_mock_content(SUPPLIER_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
+    # Set the expected return value for the supplier ID being processed in this test
+    # VALID_SUPPLIER_ROW_1 has SupplierID "201". The script checks for result[0]['id'].
+    mock_neo4j_connector.execute_query.return_value = [{"id": 201}]
     summary = process_suppliers_csv("dummy_suppliers.csv", connector=mock_neo4j_connector)
 
     assert summary["loaded_suppliers_count"] == 1
@@ -122,10 +124,10 @@ def test_process_valid_suppliers_with_mocked_neo4j_calls(mocker, mock_neo4j_conn
     args, kwargs = mock_neo4j_connector.execute_query.call_args
     assert "MERGE (s:Supplier {supplierID: $supplierID_param})" in args[0]
     assert "SET s = $props" in args[0]
-    assert kwargs['params']['supplierID_param'] == 201
-    assert kwargs['params']['props']['SupplierName'] == "ElectroSource Inc."
-    assert kwargs['params']['props']['supplierID'] == 201 # supplierID also in props
-    assert kwargs['tx_type'] == 'write'
+    assert args[1]['supplierID_param'] == 201 # Parameters are in args[1]
+    assert args[1]['props']['SupplierName'] == "ElectroSource Inc."
+    assert args[1]['props']['supplierID'] == 201 # supplierID also in props
+    assert kwargs['tx_type'] == 'write' # tx_type is a keyword arg
 
 def test_process_suppliers_with_neo4j_errors(mocker, mock_neo4j_connector, caplog):
     """Test handling of Neo4j errors during supplier loading."""
@@ -146,12 +148,12 @@ def test_process_suppliers_with_neo4j_errors(mocker, mock_neo4j_connector, caplo
 # Require a running Neo4j instance. Run with: pytest -m integration
 
 @pytest.fixture(scope="module")
-def neo4j_supplier_module_connector(caplog):
+def neo4j_supplier_module_connector():
     """
     Pytest fixture for supplier ingestion integration tests.
     Provides a Neo4jConnector instance and handles cleanup of test Supplier nodes.
     """
-    caplog.set_level(logging.INFO)
+    # caplog.set_level(logging.INFO) # Removed: caplog is function-scoped
     connector = None
     # Use a specific range or prefix for test SupplierIDs for easier cleanup
     test_supplier_id_prefix_int = 9900

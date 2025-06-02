@@ -128,6 +128,9 @@ def test_process_valid_customers_with_mocked_neo4j_calls(mocker, mock_neo4j_conn
     mock_csv_file = create_customer_csv_mock_content(CUSTOMER_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
+    # Set the expected return value for the customer ID being processed in this test
+    # The script checks for result[0]['id']
+    mock_neo4j_connector_unit.execute_query.return_value = [{"id": 1}]
     summary = process_customers_csv("dummy_customers.csv", connector=mock_neo4j_connector_unit)
 
     assert summary["loaded_customers_count"] == 1
@@ -135,9 +138,9 @@ def test_process_valid_customers_with_mocked_neo4j_calls(mocker, mock_neo4j_conn
     mock_neo4j_connector_unit.execute_query.assert_called_once()
     args, kwargs = mock_neo4j_connector_unit.execute_query.call_args
     assert "MERGE (c:ECCustomer {customerID: $customerID})" in args[0]
-    assert kwargs['params']['customerID'] == 1
-    assert kwargs['params']['props']['FirstName'] == "John"
-    assert kwargs['tx_type'] == 'write'
+    assert args[1]['customerID'] == 1 # Parameters are in args[1]
+    assert args[1]['props']['FirstName'] == "John"
+    assert kwargs['tx_type'] == 'write' # tx_type is a keyword arg
 
 def test_process_customers_with_neo4j_errors(mocker, mock_neo4j_connector_unit, caplog):
     """Test handling of Neo4j errors during customer loading."""

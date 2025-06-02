@@ -251,7 +251,7 @@ def test_generic_datatype_validation_crm():
         Deal(DealID=1, Amount="should_be_float_or_int")
 
     # User.FirstName (Optional[str])
-    user = User(UserID=1, FirstName=123) # Pydantic will coerce to "123"
+    user = User(UserID=1, FirstName="123") # Pydantic V2 requires explicit string
     assert user.FirstName == "123"
     with pytest.raises(PydanticValidationError):
         User(UserID=1, FirstName={"name": "test"}) # Cannot coerce dict to str easily

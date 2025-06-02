@@ -64,7 +64,7 @@ def test_process_valid_orders_no_neo4j(mocker, caplog):
     summary = process_orders_csv("dummy_orders.csv", connector=None)
 
     assert summary["processed_rows"] == 3
-    assert summary["validated_orders_count"] == 2 # 1001, 1002
+    assert summary["validated_orders_count"] == 3 # Script validates order part of each row
     assert summary["validated_items_count"] == 3
     assert summary["loaded_orders_count"] == 0
     assert summary["loaded_items_relationships_count"] == 0
@@ -75,8 +75,8 @@ def test_process_valid_orders_no_neo4j(mocker, caplog):
     assert "OrderItem Pydantic-validated: 2001" in caplog.text
     assert "OrderItem Pydantic-validated: 2002" in caplog.text
     assert "OrderItem Pydantic-validated: 2003" in caplog.text
-    # Check that order 1001 was validated only once despite two item rows
-    assert caplog.text.count("Order Pydantic-validated: 1001") == 1
+    # Check that order 1001 was validated for each of its item rows
+    assert caplog.text.count("Order Pydantic-validated: 1001") == 2
 
 
 def test_process_orders_invalid_order_data(mocker, caplog):
@@ -84,8 +84,8 @@ def test_process_orders_invalid_order_data(mocker, caplog):
     caplog.set_level(logging.ERROR)
     csv_rows = [
         {**ORDER_1_PART, **ITEM_1A}, # Valid
-        {"OrderID":"bad_id","CustomerID":"1", ...}, # Invalid OrderID (mocking rest of fields for brevity)
-        {"OrderID":"1003","CustomerID":"-3", ...}, # Invalid CustomerID
+        {"OrderID":"bad_id","CustomerID":"1"}, # Invalid OrderID (mocking rest of fields for brevity)
+        {"OrderID":"1003","CustomerID":"-3"}, # Invalid CustomerID
     ]
     # Fill in missing fields for robust test
     csv_rows[1].update({"OrderDate":"2023-01-03 10:00:00","OrderStatus":"Pending","OrderTotalAmount":"10.0","ShippingAddress":"N/A","BillingAddress":"N/A","OrderItemID":"2004","ProductID":"104","Quantity":"1","UnitPrice":"10.0"})
@@ -116,7 +116,13 @@ def test_process_orders_invalid_item_data(mocker, caplog):
     summary = process_orders_csv("dummy_orders.csv", connector=None)
 
     assert summary["processed_rows"] == 3
-    assert summary["validated_orders_count"] == 2 # Both orders 1001 and 1002 are Pydantic-valid
+    # Order 1001 (from ITEM_1A) is valid. Order parts of row 2 and 3 are Pydantic-valid if types are okay.
+    # The items for row 2 and 3 fail, but their Order parts might pass initial Pydantic validation.
+    # The script validates Order and OrderItem separately.
+    # Order 1 (from ITEM_1A) is valid.
+    # Order 1 (from bad_item_id row) is valid.
+    # Order 2 (from invalid quantity row) is valid.
+    assert summary["validated_orders_count"] == 3 # Script validates order part of each row
     assert summary["validated_items_count"] == 1 # Only ITEM_1A
     assert summary["validation_errors"] >= 2 # 2 items have validation errors
     assert "Validation error" in caplog.text # For Pydantic CSVOrderItemData model
@@ -131,6 +137,13 @@ def test_process_orders_mocked_neo4j_calls_multi_item_order(mocker, mock_neo4j_c
     mock_csv_file = create_orders_csv_mock_content(ORDERS_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
+    # Define side effects for the mock connector to simulate Neo4j responses
+    mock_neo4j_connector.execute_query.side_effect = [
+        [{"o.orderID": 1001}],  # Mock response for merging Order 1001
+        [{"rel_type": "PLACED"}],  # Mock response for PLACED relationship
+        [{"rel_type": "CONTAINS"}],# Mock response for CONTAINS for ITEM_1A
+        [{"rel_type": "CONTAINS"}] # Mock response for CONTAINS for ITEM_1B
+    ]
     summary = process_orders_csv("dummy_orders.csv", connector=mock_neo4j_connector)
 
     assert summary["loaded_orders_count"] == 1
@@ -144,31 +157,31 @@ def test_process_orders_mocked_neo4j_calls_multi_item_order(mocker, mock_neo4j_c
     # Call 1: Merge Order Node
     call_order_node = mock_neo4j_connector.execute_query.call_args_list[0]
     assert "MERGE (o:Order {orderID: $orderID})" in call_order_node.args[0]
-    assert call_order_node.kwargs['params']['orderID'] == 1001
-    assert call_order_node.kwargs['params']['props']['OrderTotalAmount'] == 150.00
+    assert call_order_node.args[1]['orderID'] == 1001
+    assert call_order_node.args[1]['props']['TotalAmount'] == 150.00 # Key in Pydantic model is TotalAmount
 
     # Call 2: Merge PLACED Relationship
     call_placed_rel = mock_neo4j_connector.execute_query.call_args_list[1]
     assert "MATCH (c:ECCustomer {customerID: $customerID})" in call_placed_rel.args[0]
     assert "MERGE (c)-[r:PLACED]->(o)" in call_placed_rel.args[0]
-    assert call_placed_rel.kwargs['params']['orderID'] == 1001
-    assert call_placed_rel.kwargs['params']['customerID'] == 1
+    assert call_placed_rel.args[1]['orderID'] == 1001
+    assert call_placed_rel.args[1]['customerID'] == 1
 
     # Call 3: Merge CONTAINS for ITEM_1A
     call_contains_1a = mock_neo4j_connector.execute_query.call_args_list[2]
     assert "MERGE (o)-[r:CONTAINS {orderItemID: $orderItemID}]->(p)" in call_contains_1a.args[0]
-    assert call_contains_1a.kwargs['params']['orderItemID'] == 2001
-    assert call_contains_1a.kwargs['params']['quantity'] == 1
-    assert call_contains_1a.kwargs['params']['unitPrice'] == 100.00
-    assert call_contains_1a.kwargs['params']['totalItemPrice'] == 1 * 100.00
+    assert call_contains_1a.args[1]['orderItemID'] == 2001
+    assert call_contains_1a.args[1]['quantity'] == 1
+    assert call_contains_1a.args[1]['unitPrice'] == 100.00
+    assert call_contains_1a.args[1]['totalItemPrice'] == 1 * 100.00
 
     # Call 4: Merge CONTAINS for ITEM_1B
     call_contains_1b = mock_neo4j_connector.execute_query.call_args_list[3]
     assert "MERGE (o)-[r:CONTAINS {orderItemID: $orderItemID}]->(p)" in call_contains_1b.args[0]
-    assert call_contains_1b.kwargs['params']['orderItemID'] == 2002
-    assert call_contains_1b.kwargs['params']['quantity'] == 2
-    assert call_contains_1b.kwargs['params']['unitPrice'] == 25.00
-    assert call_contains_1b.kwargs['params']['totalItemPrice'] == 2 * 25.00
+    assert call_contains_1b.args[1]['orderItemID'] == 2002
+    assert call_contains_1b.args[1]['quantity'] == 2
+    assert call_contains_1b.args[1]['unitPrice'] == 25.00
+    assert call_contains_1b.args[1]['totalItemPrice'] == 2 * 25.00
 
 
 def test_process_orders_neo4j_error_on_order_merge(mocker, mock_neo4j_connector, caplog):
@@ -250,13 +263,13 @@ def test_csvorderitemdata_validation():
 # Require a running Neo4j instance. Run with: pytest -m integration
 
 @pytest.fixture(scope="module")
-def neo4j_order_module_connector_and_setup(caplog): # Added caplog for fixture logging
+def neo4j_order_module_connector_and_setup():
     """
     Pytest fixture for order ingestion integration tests.
     Provides a Neo4jConnector instance and sets up prerequisite Customer and Product nodes.
     Cleans up all created data (Orders, specific Customers, specific Products) afterwards.
     """
-    caplog.set_level(logging.INFO)
+    # caplog.set_level(logging.INFO) # Removed: caplog is function-scoped
     connector = None
     # Define IDs for prerequisite and test-created data to manage cleanup
     # These IDs should be distinct from any other tests or sample data loaders

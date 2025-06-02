@@ -19,9 +19,8 @@ from neo4j.exceptions import Neo4jError, ServiceUnavailable
 def mock_neo4j_connector(mocker):
     """Fixture to mock Neo4jConnector for review ingestion unit tests."""
     mock_conn = MagicMock(spec=Neo4jConnector)
-    # Default behavior: successful query execution returning a mock ID or relevant data
-    # Simulate list of dicts as records for general case
-    mock_conn.execute_query.return_value = [{"id_or_type": "mock_result"}]
+    # Default behavior, can be overridden in tests using side_effect or specific return_value
+    mock_conn.execute_query.return_value = [{"id": "mock_review_id"}]
     return mock_conn
 
 def create_reviews_csv_mock_content(headers, rows_as_dicts):
@@ -93,7 +92,7 @@ def test_process_reviews_pydantic_validation_errors(mocker, caplog):
 def test_process_reviews_type_conversion_error(mocker, caplog):
     """Test CSV with type conversion errors (e.g., bad date, non-numeric score)."""
     # Errors from _parse_xxx are warnings. Pydantic error if required field becomes None.
-    caplog.set_level(logging.WARNING) # To catch parsing warnings
+    caplog.set_level(logging.WARNING) # To catch parsing warnings for the whole test
     csv_rows = [
         {"ReviewID":"705","CustomerID":"3","ProductID":"104","Rating":"4",
          "ReviewText":"Bad date here.","ReviewDate":"not-a-date-at-all", # Invalid date
@@ -102,9 +101,7 @@ def test_process_reviews_type_conversion_error(mocker, caplog):
     mock_csv_file = create_reviews_csv_mock_content(REVIEWS_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
-    # Run with error level to catch Pydantic errors if required fields become None
-    with caplog.at_level(logging.ERROR):
-        summary = process_reviews_csv("dummy_reviews.csv", connector=None)
+    summary = process_reviews_csv("dummy_reviews.csv", connector=None)
 
     assert summary["processed_rows"] == 1
     # ReviewDate and SentimentScore are Optional in Pydantic model, so None is fine
@@ -120,10 +117,12 @@ def test_process_reviews_mocked_neo4j_calls_full_success(mocker, mock_neo4j_conn
     mock_csv_file = create_reviews_csv_mock_content(REVIEWS_CSV_HEADERS, csv_rows)
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
-    # Configure specific return values for each call if needed for more complex tests
-    # For this test, the default mock_id return is fine for successful MERGE.
-    mock_neo4j_connector.execute_query.return_value = [{"id_or_type": "mock_result"}]
-
+    # Define side effects for the mock connector to simulate Neo4j responses
+    mock_neo4j_connector.execute_query.side_effect = [
+        [{"id": 701}],                # Mock response for merging Review 701
+        [{"type": "WROTE_REVIEW"}],  # Mock response for WROTE_REVIEW relationship
+        [{"type": "HAS_REVIEW"}]     # Mock response for HAS_REVIEW relationship
+    ]
 
     summary = process_reviews_csv("dummy_reviews.csv", connector=mock_neo4j_connector)
 
@@ -137,24 +136,24 @@ def test_process_reviews_mocked_neo4j_calls_full_success(mocker, mock_neo4j_conn
     # Call 1: Merge Review Node
     call_review_node = mock_neo4j_connector.execute_query.call_args_list[0]
     assert "MERGE (rev:Review {reviewID: $reviewID_param})" in call_review_node.args[0]
-    assert call_review_node.kwargs['params']['reviewID_param'] == 701
-    assert call_review_node.kwargs['params']['props']['ReviewText'] == "Great product!"
+    assert call_review_node.args[1]['reviewID_param'] == 701
+    assert call_review_node.args[1]['props']['ReviewText'] == "Great product!"
 
     # Call 2: Merge WROTE_REVIEW Relationship
     call_wrote_rel = mock_neo4j_connector.execute_query.call_args_list[1]
     assert "MATCH (c:ECCustomer {customerID: $customerID})" in call_wrote_rel.args[0]
     assert "MATCH (rev:Review {reviewID: $reviewID})" in call_wrote_rel.args[0]
     assert "MERGE (c)-[r:WROTE_REVIEW]->(rev)" in call_wrote_rel.args[0]
-    assert call_wrote_rel.kwargs['params']['customerID'] == 1
-    assert call_wrote_rel.kwargs['params']['reviewID'] == 701
+    assert call_wrote_rel.args[1]['customerID'] == 1
+    assert call_wrote_rel.args[1]['reviewID'] == 701
 
     # Call 3: Merge HAS_REVIEW Relationship
     call_has_rel = mock_neo4j_connector.execute_query.call_args_list[2]
     assert "MATCH (p:Product {productID: $productID})" in call_has_rel.args[0]
     assert "MATCH (rev:Review {reviewID: $reviewID})" in call_has_rel.args[0]
     assert "MERGE (p)-[r:HAS_REVIEW]->(rev)" in call_has_rel.args[0]
-    assert call_has_rel.kwargs['params']['productID'] == 101
-    assert call_has_rel.kwargs['params']['reviewID'] == 701
+    assert call_has_rel.args[1]['productID'] == 101
+    assert call_has_rel.args[1]['reviewID'] == 701
 
 def test_process_reviews_skip_rels_if_ids_missing(mocker, mock_neo4j_connector, caplog):
     """Test that relationships are skipped if CustomerID or ProductID is missing."""
@@ -165,11 +164,22 @@ def test_process_reviews_skip_rels_if_ids_missing(mocker, mock_neo4j_connector, 
     mock_csv_file = create_reviews_csv_mock_content(REVIEWS_CSV_HEADERS, [csv_row_no_cid, csv_row_no_pid])
     mocker.patch('builtins.open', return_value=mock_csv_file)
 
+    # Define side effects for the mock connector
+    # Review 707 (no CustomerID): Merge Review node, Attempt HAS_REVIEW
+    # Review 708 (no ProductID): Merge Review node, Attempt WROTE_REVIEW
+    mock_neo4j_connector.execute_query.side_effect = [
+        [{"id": 707}],  # Review 707 node merged
+        [{"type": "HAS_REVIEW"}], # HAS_REVIEW for 707 successful
+        [{"id": 708}],  # Review 708 node merged
+        [{"type": "WROTE_REVIEW"}] # WROTE_REVIEW for 708 successful
+    ]
     process_reviews_csv("dummy_reviews.csv", connector=mock_neo4j_connector)
 
-    # For row_no_cid (Review 707): 1 call for Review node, 0 for WROTE_REVIEW, 1 for HAS_REVIEW
-    # For row_no_pid (Review 708): 1 call for Review node, 1 for WROTE_REVIEW, 0 for HAS_REVIEW
-    # Total calls = (1+0+1) + (1+1+0) = 4
+    # For row_no_cid (Review 707): 1 call for Review node, 0 for WROTE_REVIEW (skipped by script logic), 1 for HAS_REVIEW
+    # For row_no_pid (Review 708): 1 call for Review node, 1 for WROTE_REVIEW, 0 for HAS_REVIEW (skipped by script logic)
+    # Total calls = (1+1) for 707 (merge node, merge HAS_REVIEW)
+    #             + (1+1) for 708 (merge node, merge WROTE_REVIEW)
+    # = 4 calls
     assert mock_neo4j_connector.execute_query.call_count == 4
     assert "No CustomerID for Review 707, skipping WROTE_REVIEW" in caplog.text
     assert "No ProductID for Review 708, skipping HAS_REVIEW" in caplog.text
@@ -196,12 +206,12 @@ def test_process_reviews_neo4j_error_on_review_node(mocker, mock_neo4j_connector
 # Require a running Neo4j instance. Run with: pytest -m integration
 
 @pytest.fixture(scope="module")
-def neo4j_review_module_connector_and_setup(caplog):
+def neo4j_review_module_connector_and_setup():
     """
     Pytest fixture for review ingestion integration tests.
     Provides a Neo4jConnector, sets up prerequisite Customer & Product nodes, and cleans up.
     """
-    caplog.set_level(logging.INFO)
+    # caplog.set_level(logging.INFO) # Removed: caplog is function-scoped
     connector = None
     # Define IDs for prerequisite and test-created data
     test_customer_ids = [9050, 9060]

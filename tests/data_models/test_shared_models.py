@@ -80,7 +80,7 @@ def test_chatsession_datetime_fields_validation():
     with pytest.raises(PydanticValidationError, match="StartTime"):
         ChatSession(ChatSessionID=1, StartTime="not-a-date")
     with pytest.raises(PydanticValidationError, match="EndTime"):
-        ChatSession(ChatSessionID=1, EndTime=12345)
+        ChatSession(ChatSessionID=1, EndTime="not-a-valid-date-string-either") # Changed from 12345
     session = ChatSession(ChatSessionID=1, StartTime=VALID_DATETIME, EndTime=VALID_DATETIME)
     assert session.StartTime == VALID_DATETIME
     assert session.EndTime == VALID_DATETIME
@@ -88,8 +88,8 @@ def test_chatsession_datetime_fields_validation():
 def test_chatsession_platform_validation():
     session = ChatSession(ChatSessionID=1, Platform="Mobile App")
     assert session.Platform == "Mobile App"
-    # Platform is Optional[str], so Pydantic will try to coerce if not strict
-    session_coerced = ChatSession(ChatSessionID=1, Platform=123)
+    # Platform is Optional[str], Pydantic V2 requires explicit string
+    session_coerced = ChatSession(ChatSessionID=1, Platform="123")
     assert session_coerced.Platform == "123"
 
 
@@ -177,8 +177,8 @@ def test_chatmessage_optional_text_fields():
     message = ChatMessage(ChatMessageID=1, SenderType="Agent", MessageText="Response")
     assert message.SenderType == "Agent"
     assert message.MessageText == "Response"
-    # Test coercion for SenderType (Optional[str])
-    message_coerced = ChatMessage(ChatMessageID=1, SenderType=123)
+    # Test coercion for SenderType (Optional[str]), Pydantic V2 requires explicit string
+    message_coerced = ChatMessage(ChatMessageID=1, SenderType="123")
     assert message_coerced.SenderType == "123"
 
 

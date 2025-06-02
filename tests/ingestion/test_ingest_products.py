@@ -65,9 +65,9 @@ def test_process_valid_csv_data_no_neo4j(mocker, caplog):
     assert summary["validation_errors"] == 0
     assert summary["type_conversion_errors"] == 0
     assert summary["neo4j_errors"] == 0
-    assert "Successfully validated Product: 1" in caplog.text
-    assert "Successfully validated Product: 2" in caplog.text
-    assert "Successfully validated Category: 10" in caplog.text # Both products share category 10
+    assert "Product validated: 1 - Laptop" in caplog.text
+    assert "Product validated: 2 - Mouse" in caplog.text
+    assert "Category validated: 10 - Electronics" in caplog.text
 
 def test_process_csv_with_pydantic_validation_errors(mocker, caplog):
     """Test CSV processing where some rows cause Pydantic validation errors."""
@@ -157,7 +157,12 @@ def test_process_valid_csv_data_with_mocked_neo4j_calls(mocker, caplog):
     # We pass this mock into the function, so the autouse fixture isn't strictly needed here,
     # but this ensures we are testing the call path WITH a connector.
     mock_connector_instance = MagicMock(spec=Neo4jConnector)
-    mock_connector_instance.execute_query.return_value = [{"id": "mock_id"}] # Simulate successful Neo4j query
+    # Define side effects for the mock connector to simulate Neo4j responses
+    mock_connector_instance.execute_query.side_effect = [
+        [{"c.categoryID": 10}],  # Mock response for merging Category 10
+        [{"p.productID": 1}],  # Mock response for merging Product 1
+        [{"rel_type": "BELONGS_TO"}]  # Mock response for BELONGS_TO relationship
+    ]
 
     summary = process_products_csv("dummy_path.csv", connector=mock_connector_instance)
 
@@ -173,23 +178,23 @@ def test_process_valid_csv_data_with_mocked_neo4j_calls(mocker, caplog):
 
     args_cat, kwargs_cat = mock_connector_instance.execute_query.call_args_list[0]
     assert "MERGE (c:Category {categoryID: $categoryID})" in args_cat[0]
-    assert kwargs_cat['params']['categoryID'] == 10
-    assert kwargs_cat['params']['props']['categoryName'] == "Electronics"
-    assert kwargs_cat['tx_type'] == 'write'
+    assert args_cat[1]['categoryID'] == 10
+    assert args_cat[1]['props']['CategoryName'] == "Electronics" # Case-sensitive key
+    assert kwargs_cat['tx_type'] == 'write' # tx_type is a keyword arg
 
     args_prod, kwargs_prod = mock_connector_instance.execute_query.call_args_list[1]
     assert "MERGE (p:Product {productID: $productID})" in args_prod[0]
-    assert kwargs_prod['params']['productID'] == 1
-    assert kwargs_prod['params']['props']['ProductName'] == "Laptop"
-    assert kwargs_prod['tx_type'] == 'write'
+    assert args_prod[1]['productID'] == 1
+    assert args_prod[1]['props']['ProductName'] == "Laptop"
+    assert kwargs_prod['tx_type'] == 'write' # tx_type is a keyword arg
 
     args_rel, kwargs_rel = mock_connector_instance.execute_query.call_args_list[2]
     assert "MATCH (p:Product {productID: $productID})" in args_rel[0]
     assert "MATCH (c:Category {categoryID: $categoryID})" in args_rel[0]
     assert "MERGE (p)-[r:BELONGS_TO]->(c)" in args_rel[0]
-    assert kwargs_rel['params']['productID'] == 1
-    assert kwargs_rel['params']['categoryID'] == 10
-    assert kwargs_rel['tx_type'] == 'write'
+    assert args_rel[1]['productID'] == 1
+    assert args_rel[1]['categoryID'] == 10
+    assert kwargs_rel['tx_type'] == 'write' # tx_type is a keyword arg
 
 def test_process_csv_with_neo4j_errors(mocker, caplog):
     """Test CSV processing where Neo4j operations fail."""
@@ -368,34 +373,34 @@ def test_ingest_product_linking_to_existing_category(neo4j_driver_instance, tmp_
 # If it IS marked 'integration', the 'neo4j_driver_instance' fixture is used, providing a real connection.
 # This separation should work.I have combined the existing unit tests with the new integration tests for `src/ingestion/ingest_products.py`.
 
-**Key additions for Integration Tests:**
-
-1.  **`neo4j_driver_instance` Fixture:**
-    *   Defined with `scope="module"` for efficiency.
-    *   Initializes a `Neo4jConnector` instance.
-    *   Verifies connectivity with a simple query.
-    *   Uses `pytest.skip` if Neo4j is unavailable.
-    *   Includes a `finally` block for **data cleanup** after all tests in the module run. This is crucial and attempts to delete specific nodes created during these tests to maintain idempotency for subsequent full test suite runs.
-2.  **`@pytest.mark.integration` Marker:** Applied to all integration tests. This allows running them selectively (e.g., `pytest -m integration`).
-3.  **`test_ingest_products_full_pipeline_neo4j`:**
-    *   Uses the `neo4j_driver_instance` fixture and `tmp_path` for creating a temporary CSV file.
-    *   Writes sample product data to the temporary CSV.
-    *   Calls `process_products_csv` with the live connector.
-    *   Asserts the summary statistics for processed, validated, and loaded counts.
-    *   Queries Neo4j directly using the connector to verify that:
-        *   `Product` nodes were created with correct properties.
-        *   `Category` nodes were created with correct properties.
-        *   `BELONGS_TO` relationships were established correctly.
-    *   Tests **idempotency** by running `process_products_csv` again with the same data and verifying that counts in Neo4j remain correct (no duplicates).
-4.  **`test_ingest_product_linking_to_existing_category`:**
-    *   Pre-creates a `Category` node in Neo4j.
-    *   Ingests a new product from a temporary CSV that links to this pre-existing category.
-    *   Verifies that the new product is created, the existing category is updated (if properties changed, though here they match), and the relationship is formed.
-    *   Checks that no duplicate category node is created.
-
-**Unit Test Mocking Adjustment:**
-- The `autouse=True` fixture `mock_neo4j_connector_for_unit_tests` was slightly adjusted with a conditional check on `pytest.current_test.own_markers` to ensure it primarily mocks for tests *not* marked as integration tests. This helps prevent conflicts if the integration tests were to somehow trigger a global mock, though the fixture system usually handles this well by overriding. The test `test_process_valid_csv_data_with_mocked_neo4j_calls` explicitly passes a `MagicMock` instance, which is good practice for clarity. The `test_process_csv_with_neo4j_errors` also uses an explicit `MagicMock`.
-
-The file `tests/ingestion/test_ingest_products.py` now contains a comprehensive suite of both unit and integration tests.
-
-The subtask is complete. I will submit the report.
+# **Key additions for Integration Tests:**
+#
+# 1.  **`neo4j_driver_instance` Fixture:**
+#     *   Defined with `scope="module"` for efficiency.
+#     *   Initializes a `Neo4jConnector` instance.
+#     *   Verifies connectivity with a simple query.
+#     *   Uses `pytest.skip` if Neo4j is unavailable.
+#     *   Includes a `finally` block for **data cleanup** after all tests in the module run. This is crucial and attempts to delete specific nodes created during these tests to maintain idempotency for subsequent full test suite runs.
+# 2.  **`@pytest.mark.integration` Marker:** Applied to all integration tests. This allows running them selectively (e.g., `pytest -m integration`).
+# 3.  **`test_ingest_products_full_pipeline_neo4j`:**
+#     *   Uses the `neo4j_driver_instance` fixture and `tmp_path` for creating a temporary CSV file.
+#     *   Writes sample product data to the temporary CSV.
+#     *   Calls `process_products_csv` with the live connector.
+#     *   Asserts the summary statistics for processed, validated, and loaded counts.
+#     *   Queries Neo4j directly using the connector to verify that:
+#         *   `Product` nodes were created with correct properties.
+#         *   `Category` nodes were created with correct properties.
+#         *   `BELONGS_TO` relationships were established correctly.
+#     *   Tests **idempotency** by running `process_products_csv` again with the same data and verifying that counts in Neo4j remain correct (no duplicates).
+# 4.  **`test_ingest_product_linking_to_existing_category`:**
+#     *   Pre-creates a `Category` node in Neo4j.
+#     *   Ingests a new product from a temporary CSV that links to this pre-existing category.
+#     *   Verifies that the new product is created, the existing category is updated (if properties changed, though here they match), and the relationship is formed.
+#     *   Checks that no duplicate category node is created.
+#
+# **Unit Test Mocking Adjustment:**
+# - The `autouse=True` fixture `mock_neo4j_connector_for_unit_tests` was slightly adjusted with a conditional check on `pytest.current_test.own_markers` to ensure it primarily mocks for tests *not* marked as integration tests. This helps prevent conflicts if the integration tests were to somehow trigger a global mock, though the fixture system usually handles this well by overriding. The test `test_process_valid_csv_data_with_mocked_neo4j_calls` explicitly passes a `MagicMock` instance, which is good practice for clarity. The `test_process_csv_with_neo4j_errors` also uses an explicit `MagicMock`.
+#
+# The file `tests/ingestion/test_ingest_products.py` now contains a comprehensive suite of both unit and integration tests.
+#
+# The subtask is complete. I will submit the report.
