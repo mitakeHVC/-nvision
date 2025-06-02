@@ -10,6 +10,7 @@ services:
     command: pytest -v
     depends_on:
       - neo4j
+      - chromadb
 
   # Neo4jデータベース（将来的に必要になる可能性があるため）
   neo4j:
@@ -26,8 +27,20 @@ services:
       - neo4j_import:/var/lib/neo4j/import
       - neo4j_plugins:/plugins
 
+  # ChromaDBベクトルデータベース
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    volumes:
+      - chromadb_data:/chroma/chroma
+
 volumes:
   neo4j_data:
   neo4j_logs:
   neo4j_import:
   neo4j_plugins:
+  chromadb_data:

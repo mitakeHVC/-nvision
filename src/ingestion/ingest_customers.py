@@ -86,7 +86,12 @@ def process_customers_csv(csv_file_path: str, connector: Optional[Neo4jConnector
                     # Load into Neo4j if connector is provided
                     if connector:
                         # Use model_dump for Pydantic v2, or .dict() for v1
-                        props = customer_instance.model_dump(exclude_none=True)
+                        try:
+                            # Pydantic v2
+                            props = customer_instance.model_dump(exclude_none=True)
+                        except AttributeError:
+                            # Pydantic v1
+                            props = customer_instance.dict(exclude_none=True)
                         # Ensure customerID is in props for the SET clause
                         props['customerID'] = customer_instance.CustomerID
 
