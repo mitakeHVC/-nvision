@@ -1,10 +1,39 @@
-# 基本的な依存関係
-pytest==7.3.1
-pydantic==1.10.8
-email-validator==2.0.0
+# Core Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
 
-# Neo4j関連
-neo4j==5.8.1
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
 
-# ChromaDB関連（将来的に必要になる可能性があるため）
-chromadb==0.4.6
+# Database Dependencies
+neo4j==5.15.0
+chromadb==0.4.18
+
+# AI/ML Dependencies
+sentence-transformers==2.2.2
+transformers==4.35.2
+torch==2.1.1
+numpy==1.24.4
+pandas==2.1.4
+
+# Testing Dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Code Quality Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+bandit==1.7.5
+
+# Development Tools
+pre-commit==3.6.0

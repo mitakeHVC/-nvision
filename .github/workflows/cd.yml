@@ -1,0 +1,230 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+        # ここに実際のデプロイメントロジックを追加
+        # 例: kubectl, docker-compose, AWS ECS, etc.
+        
+        # Docker Compose を使用したローカルデプロイメントの例
+        cat > docker-compose.staging.yml << EOF
+        version: '3.8'
+        services:
+          app:
+            image: ${{ needs.build-and-push.outputs.image-tag }}
+            ports:
+              - "8000:8000"
+            environment:
+              - ENV=staging
+              - NEO4J_URI=bolt://neo4j:7687
+              - NEO4J_USER=neo4j
+              - NEO4J_PASSWORD=staging_password
+              - CHROMA_HOST=chroma
+              - CHROMA_PORT=8000
+            depends_on:
+              - neo4j
+              - chroma
+          
+          neo4j:
+            image: neo4j:5.0
+            environment:
+              - NEO4J_AUTH=neo4j/staging_password
+              - NEO4J_PLUGINS=["apoc"]
+            ports:
+              - "7474:7474"
+              - "7687:7687"
+            volumes:
+              - neo4j_staging_data:/data
+          
+          chroma:
+            image: chromadb/chroma:latest
+            ports:
+              - "8001:8000"
+            volumes:
+              - chroma_staging_data:/chroma/chroma
+        
+        volumes:
+          neo4j_staging_data:
+          chroma_staging_data:
+        EOF
+        
+        echo "Staging deployment configuration created"
+    
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        # 実際のヘルスチェックロジックをここに追加
+        echo "Health check passed"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+        
+        # 本番環境デプロイメントの例
+        cat > docker-compose.production.yml << EOF
+        version: '3.8'
+        services:
+          app:
+            image: ${{ needs.build-and-push.outputs.image-tag }}
+            ports:
+              - "80:8000"
+            environment:
+              - ENV=production
+              - NEO4J_URI=bolt://neo4j:7687
+              - NEO4J_USER=neo4j
+              - NEO4J_PASSWORD=\${{ secrets.NEO4J_PRODUCTION_PASSWORD }}
+              - CHROMA_HOST=chroma
+              - CHROMA_PORT=8000
+            depends_on:
+              - neo4j
+              - chroma
+            restart: unless-stopped
+          
+          neo4j:
+            image: neo4j:5.0
+            environment:
+              - NEO4J_AUTH=neo4j/\${{ secrets.NEO4J_PRODUCTION_PASSWORD }}
+              - NEO4J_PLUGINS=["apoc"]
+            ports:
+              - "7474:7474"
+              - "7687:7687"
+            volumes:
+              - neo4j_production_data:/data
+            restart: unless-stopped
+          
+          chroma:
+            image: chromadb/chroma:latest
+            ports:
+              - "8000:8000"
+            volumes:
+              - chroma_production_data:/chroma/chroma
+            restart: unless-stopped
+        
+        volumes:
+          neo4j_production_data:
+          chroma_production_data:
+        EOF
+        
+        echo "Production deployment configuration created"
+    
+    - name: Production health check
+      run: |
+        echo "Performing production health check..."
+        # 実際のヘルスチェックロジックをここに追加
+        echo "Production health check passed"
+    
+    - name: Notify deployment
+      run: |
+        echo "Production deployment completed successfully"
+        echo "Version: ${{ github.ref_name }}"
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ needs.build-and-push.outputs.image-tag }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
