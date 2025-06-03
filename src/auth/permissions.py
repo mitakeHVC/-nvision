@@ -77,6 +77,9 @@ class Permission(Enum):
     SUGGESTION_READ = "suggestion:read"
     ACTION_PLAN_UPDATE = "action_plan:update" # Covers updating step status
 
+    # Reporting Permissions
+    REPORT_READ = "report:read"
+
 
 class Role(Enum):
     """システムロールの定義"""
@@ -273,17 +276,18 @@ class PermissionManager:
                 Permission.CLIENT_PREFERENCES_DELETE,
                 Permission.SUGGESTION_READ,         # Manager can read suggestions
                 Permission.ACTION_PLAN_UPDATE,      # Manager can update action plans
+                Permission.REPORT_READ,             # Manager can read reports
             })
-            logger.info(f"Client preference, suggestion, and action plan permissions added to role '{Role.MANAGER.value}'")
+            logger.info(f"Client preference, suggestion, action plan, and report permissions added to role '{Role.MANAGER.value}'")
 
-        # Ensure ANALYST can read preferences and suggestions
+        # Ensure ANALYST can read preferences, suggestions, and reports
         if Role.ANALYST.value in self._role_definitions:
              self._role_definitions[Role.ANALYST.value].permissions.update({
                 Permission.CLIENT_PREFERENCES_READ,
                 Permission.SUGGESTION_READ,         # Analyst can read suggestions
-                # ACTION_PLAN_UPDATE could be analyst or manager only, let's give to manager for now
+                Permission.REPORT_READ,             # Analyst can read reports
              })
-             logger.info(f"Client preference and suggestion read permissions added to role '{Role.ANALYST.value}'")
+             logger.info(f"Client preference, suggestion, and report read permissions added to role '{Role.ANALYST.value}'")
     
     def define_role(
         self,

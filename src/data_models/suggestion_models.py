@@ -12,6 +12,7 @@ class Suggestion(BaseModel):
     related_data_points: Optional[List[Dict[str, Any]]] = Field(None, description="Key data points supporting the suggestion")
     potential_impact: Optional[str] = Field(None, description="Potential positive impact if addressed")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by_user_id: Optional[str] = None # Added for consistency with repo layer
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -33,6 +34,8 @@ class ActionPlan(BaseModel):
     overall_status: str = Field("pending", description="e.g., 'pending', 'in_progress', 'completed'")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by_user_id: Optional[str] = None # Added for consistency
+    updated_by_user_id: Optional[str] = None # Added for consistency
 
     model_config = ConfigDict(populate_by_name=True)
 
