@@ -24,19 +24,33 @@ def get_analytics_service_dependency() -> AnalyticsService:
     # Based on previous files, services are often instantiated directly.
     return AnalyticsService()
 
+from src.repositories.suggestion_repository import SuggestionRepository # Import repository
+from src.neo4j_utils.connector import Neo4jConnector # For repository dependency
+
 # Dependency function for ClientPreferenceService
 def get_client_preference_service_dependency() -> ClientPreferenceService:
     # Similar assumption as AnalyticsService
     return ClientPreferenceService()
 
+# Dependency function for SuggestionRepository
+def get_suggestion_repository_dependency() -> SuggestionRepository:
+    # This assumes Neo4jConnector can be instantiated simply or is managed elsewhere by FastAPI's DI
+    # if Neo4jConnector itself has complex dependencies.
+    # For now, direct instantiation, consistent with how other repo deps might be handled.
+    # A more robust setup might have Neo4jConnector as a separate, globally managed dependency.
+    connector = Neo4jConnector() # Or Depends(get_neo4j_connector) if that exists
+    return SuggestionRepository(neo4j_connector=connector)
+
 # Dependency function for SuggestionService
 def get_suggestion_service(
     analytics_service: AnalyticsService = Depends(get_analytics_service_dependency),
-    client_preference_service: ClientPreferenceService = Depends(get_client_preference_service_dependency)
+    client_preference_service: ClientPreferenceService = Depends(get_client_preference_service_dependency),
+    suggestion_repository: SuggestionRepository = Depends(get_suggestion_repository_dependency)
 ) -> SuggestionService:
     return SuggestionService(
         analytics_service=analytics_service,
-        client_preference_service=client_preference_service
+        client_preference_service=client_preference_service,
+        suggestion_repository=suggestion_repository
     )
 
 # --- Request Models ---
@@ -106,10 +120,13 @@ async def update_action_plan_step_status(
     if not status_update.new_status.strip():
         raise APIValidationError("New status cannot be empty.")
 
+    user_id = str(current_user.user_id) # Ensure user_id is string if that's what service expects
+
     updated_action_plan = await suggestion_service.update_action_plan_step_status(
         action_plan_id=action_plan_id,
         step_id=step_id,
-        new_status=status_update.new_status
+        new_status=status_update.new_status,
+        updated_by_user_id=user_id
     )
     if not updated_action_plan:
         raise APINotFoundError(f"Action plan with ID '{action_plan_id}' or step ID '{step_id}' not found, or update failed.")

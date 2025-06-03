@@ -6,12 +6,18 @@ from src.data_models.suggestion_models import Suggestion, ActionPlan, ActionPlan
 from src.services.analytics_service import AnalyticsService
 from src.services.client_preference_service import ClientPreferenceService
 # Assuming core exceptions are now the standard for service layer
-from src.core.exceptions import NotFoundException, ServiceException
+from src.core.exceptions import NotFoundException, ServiceException, DatabaseException
+from src.repositories.suggestion_repository import SuggestionRepository # Import new repository
+from src.neo4j_utils.connector import Neo4jConnector # For instantiating repo if needed by service itself
 
 class SuggestionService:
-    def __init__(self, analytics_service: AnalyticsService, client_preference_service: ClientPreferenceService):
+    def __init__(self,
+                 analytics_service: AnalyticsService,
+                 client_preference_service: ClientPreferenceService,
+                 suggestion_repository: SuggestionRepository): # Inject repository
         self.analytics_service = analytics_service
         self.client_preference_service = client_preference_service
+        self.suggestion_repository = suggestion_repository
 
     async def generate_suggestions(self, client_id: str, days: int = 30) -> List[SuggestionWithActionPlan]:
         """
@@ -51,11 +57,28 @@ class SuggestionService:
 
         # Rule 2: High Customer Churn Rate (if available)
         # churn_suggestions = self._check_customer_churn(analytics_data, client_preferences)
+        # for item in churn_suggestions: # Persist these as well
+        #     await self.suggestion_repository.save_suggestion_with_plan(item, created_by_user_id=client_id) # Assuming client_id as user context
         # suggestions_with_plans.extend(churn_suggestions)
 
         # Rule 3: Opportunities from Top Performing Segments (CRM)
         # crm_opportunity_suggestions = self._check_crm_opportunities(analytics_data, client_preferences)
+        # for item in crm_opportunity_suggestions: # Persist these as well
+        #     await self.suggestion_repository.save_suggestion_with_plan(item, created_by_user_id=client_id)
         # suggestions_with_plans.extend(crm_opportunity_suggestions)
+
+        # After generating all, save them. (Or save one by one if preferred)
+        # For simplicity, let's assume the service generates them and then they are saved if needed by a controller,
+        # or if saving is intrinsic to generation:
+        for item in suggestions_with_plans:
+            try:
+                # Assuming client_id can serve as a proxy for created_by_user_id in this context
+                await self.suggestion_repository.save_suggestion_with_plan(item, created_by_user_id=client_id)
+            except DatabaseException as e:
+                # Log the error, decide if we should continue saving others or raise
+                print(f"Error saving suggestion {item.suggestion.id} for client {client_id}: {e}")
+                # Potentially collect failures and report them, or raise a consolidated error.
+                # For now, we'll let it try to save others.
 
         return suggestions_with_plans
 
@@ -230,56 +253,25 @@ class SuggestionService:
         Placeholder implementation.
         """
         # In a real implementation, this would fetch from a database or cache
-        # For now, return a hardcoded example if the ID matches, or None
+        try:
+            return await self.suggestion_repository.get_suggestion_with_plan_by_id(suggestion_id)
+        except DatabaseException as e:
+            # Log error
+            print(f"Database error fetching suggestion details for {suggestion_id}: {e}")
+            raise ServiceException(f"Could not retrieve suggestion details for {suggestion_id}.") from e
+        except Exception as e: # Catch any other unexpected errors
+            print(f"Unexpected error fetching suggestion details for {suggestion_id}: {e}")
+            raise ServiceException(f"An unexpected error occurred while fetching suggestion {suggestion_id}.") from e
 
-        example_suggestion_id_to_match = "existing_suggestion_uuid_123" # A known UUID for testing
 
-        if suggestion_id == example_suggestion_id_to_match:
-            example_suggestion = Suggestion(
-                id=suggestion_id,
-                title="Example: High Cart Abandonment Rate",
-                description="Customers are adding items to their cart but not completing purchases. Average cart abandonment rate is 75% for the last week.",
-                source_analysis_type="conversion_funnel_analysis",
-                severity="high",
-                related_data_points=[{"metric": "Cart Abandonment Rate", "value": 75, "unit": "%"}],
-                potential_impact="Reducing abandonment by 10% could increase revenue by $Y.",
-            )
-            example_action_plan = ActionPlan(
-                suggestion_id=suggestion_id,
-                title="Reduce Cart Abandonment",
-                overview="Implement measures to encourage purchase completion.",
-                steps=[ActionPlanStep(description="Offer a time-limited discount for abandoned carts via email.", responsible_area="Marketing")]
-            )
-            return SuggestionWithActionPlan(suggestion=example_suggestion, action_plan=example_action_plan)
-        return None
-
-    async def update_action_plan_step_status(self, action_plan_id: str, step_id: str, new_status: str) -> Optional[ActionPlan]:
+    async def update_action_plan_step_status(self, action_plan_id: str, step_id: str, new_status: str, updated_by_user_id: str) -> Optional[ActionPlan]:
         """
         Updates the status of a specific step within an action plan.
-        Placeholder implementation.
         """
-        # In a real implementation, this would fetch the action plan, update the step, save, and return.
-        # For now, return a hardcoded example or None.
-
-        example_action_plan_id_to_match = "existing_action_plan_uuid_abc" # A known UUID for testing
-
-        if action_plan_id == example_action_plan_id_to_match:
-            # Simulate finding and updating an action plan
-            # This is highly simplified. A real version would load the actual plan.
-            dummy_suggestion_id = str(uuid.uuid4())
-            action_plan = ActionPlan(
-                id=action_plan_id,
-                suggestion_id=dummy_suggestion_id, # In reality, this would be the correct suggestion_id
-                title="Sample Action Plan for Update",
-                overview="This is an overview of the sample plan.",
-                steps=[
-                    ActionPlanStep(step_id="step1_uuid", description="Initial step", status="completed"),
-                    ActionPlanStep(step_id=step_id, description="Step to be updated", status="pending"), # Old status
-                    ActionPlanStep(step_id="step3_uuid", description="Another step", status="pending")
-                ],
-                overall_status="in_progress",
-                updated_at=datetime.utcnow() # Update timestamp
-            )
+        try:
+            action_plan = await self.suggestion_repository.get_action_plan_by_id(action_plan_id)
+            if not action_plan:
+                raise NotFoundException(f"ActionPlan with id {action_plan_id} not found.")
 
             found_step = False
             for step in action_plan.steps:
@@ -289,16 +281,38 @@ class SuggestionService:
                     break
 
             if not found_step:
-                # If the step_id doesn't exist in this dummy plan
-                # raise NotFoundException(f"Step with id {step_id} not found in action plan {action_plan_id}")
-                return None
+                raise NotFoundException(f"Step with id {step_id} not found in action plan {action_plan_id}.")
 
-            # Potentially update overall_status based on step statuses
-            # ... (logic to determine overall_status) ...
+            # Update overall_status of the ActionPlan based on step statuses
+            # Example: if all steps are "completed", plan is "completed".
+            # If any step is "in_progress", plan is "in_progress".
+            # If all are "pending" or "deferred" (and none in_progress/completed), plan is "pending".
+            # This logic can be more sophisticated.
+            if all(s.status == "completed" for s in action_plan.steps):
+                action_plan.overall_status = "completed"
+            elif any(s.status == "in_progress" for s in action_plan.steps):
+                action_plan.overall_status = "in_progress"
+            elif all(s.status in ["pending", "deferred"] for s in action_plan.steps):
+                 action_plan.overall_status = "pending"
+            else: # Mixed, could be 'in_progress' or a more specific partial status
+                action_plan.overall_status = "in_progress"
 
-            return action_plan
 
-        return None
+            action_plan.updated_at = datetime.utcnow()
+            # updated_by_user_id will be set by the repository during the update call
+
+            updated_plan = await self.suggestion_repository.update_action_plan(action_plan, updated_by_user_id)
+            return updated_plan
+
+        except NotFoundException: # Re-raise NotFoundExceptions from this service
+            raise
+        except DatabaseException as e:
+            print(f"Database error updating action plan step for plan {action_plan_id}, step {step_id}: {e}")
+            raise ServiceException(f"Could not update action plan step for plan {action_plan_id}.") from e
+        except Exception as e:
+            print(f"Unexpected error updating action plan step for plan {action_plan_id}, step {step_id}: {e}")
+            raise ServiceException(f"An unexpected error occurred while updating action plan step.") from e
+
 
     # Other methods might include:
     # - list_suggestions_for_client(client_id: str)
