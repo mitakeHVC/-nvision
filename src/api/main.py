@@ -7,6 +7,7 @@ FastAPIアプリケーションのエントリーポイントです。
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import health
+from .routers.api_v1 import api_router as api_v1_router
 
 # FastAPIアプリケーションを作成
 app = FastAPI(
@@ -28,6 +29,7 @@ app.add_middleware(
 
 # ルーターを追加
 app.include_router(health.router, tags=["Health"])
+app.include_router(api_v1_router, prefix="/api/v1")
 
 # ルートエンドポイント
 @app.get("/")

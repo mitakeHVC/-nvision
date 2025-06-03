@@ -52,3 +52,25 @@ class PasswordResetConfirm(BaseModel):
     token: str = Field(..., description="リセットトークン")
     new_password: str = Field(..., description="新しいパスワード")
     confirm_password: str = Field(..., description="新しいパスワード（確認）")
+
+
+from datetime import datetime # Added for LoginAttempt and SecurityEvent
+
+class LoginAttempt(BaseModel):
+    """ログイン試行モデル"""
+    attempt_id: str # Should be populated, e.g. uuid
+    username: str
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    successful: bool
+    # Additional details like reason for failure, etc. could be added
+
+class SecurityEvent(BaseModel):
+    """セキュリティイベントモデル"""
+    event_id: str # Should be populated, e.g. uuid
+    event_type: str # e.g., "password_reset_request", "failed_login_limit_exceeded"
+    user_id: Optional[str] = None # Associated user if applicable
+    ip_address: Optional[str] = None
+    details: Optional[dict] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)

@@ -9,16 +9,20 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Path, status
 from fastapi.responses import JSONResponse
 
-from ....auth.dependencies import (
+from src.auth.dependencies import (
     get_current_active_user, require_permission, get_pagination_params, get_sort_params
 )
-from ....auth.permissions import Permission
-from ....auth.decorators import require_permissions, audit_log, rate_limit
-from ....auth.auth_service import AuthUser
-from ....data_models.ec_models import Product, ProductCreate, ProductUpdate
-from ....services.product_service import ProductService
-from ....repositories.product_repository import ProductRepository
-from ...exceptions import NotFoundError, AuthorizationError, handle_exceptions
+from src.auth.permissions import Permission
+from src.auth.decorators import require_permissions, audit_log, rate_limit
+from src.auth.auth_service import AuthUser
+from src.data_models.ec_models import Product, ProductCreate, ProductUpdate
+from src.services.product_service import ProductService
+from src.repositories.product_repository import ProductRepository
+from src.api.exceptions import ( # Updated imports
+    APINotFoundError,
+    APIAuthorizationError, # Assuming this might be used
+    handle_api_exceptions
+)
 
 router = APIRouter()
 
@@ -35,7 +39,7 @@ def get_product_service() -> ProductService:
 # === 商品CRUD エンドポイント ===
 
 @router.get("/", response_model=List[Product], summary="商品一覧取得")
-@handle_exceptions("Failed to get products")
+@handle_api_exceptions("Failed to get products") # Renamed decorator
 async def get_products(
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_LIST)),
     product_service: ProductService = Depends(get_product_service),
@@ -96,7 +100,7 @@ async def get_products(
 
 
 @router.get("/{product_id}", response_model=Product, summary="商品詳細取得")
-@handle_exceptions("Failed to get product")
+@handle_api_exceptions("Failed to get product") # Renamed decorator
 async def get_product(
     product_id: str = Path(..., description="商品ID"),
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_READ)),
@@ -123,13 +127,13 @@ async def get_product(
     product = await product_service.get_product_by_id(product_id)
     
     if not product:
-        raise NotFoundError("Product")
+        raise APINotFoundError("Product") # Changed to APINotFoundError
     
     return product
 
 
 @router.post("/", response_model=Product, status_code=status.HTTP_201_CREATED, summary="商品作成")
-@handle_exceptions("Failed to create product")
+@handle_api_exceptions("Failed to create product") # Renamed decorator
 async def create_product(
     product_data: ProductCreate,
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_CREATE)),
@@ -159,79 +163,45 @@ async def create_product(
 
 
 @router.put("/{product_id}", response_model=Product, summary="商品更新")
-@handle_exceptions("Failed to update product")
+@handle_api_exceptions("Failed to update product") # Renamed decorator
 async def update_product(
     product_id: str = Path(..., description="商品ID"),
     product_data: ProductUpdate = ...,
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_UPDATE)),
     product_service: ProductService = Depends(get_product_service)
 ):
-    """
-    商品情報を更新
-    
-    Args:
-        product_id: 商品ID
-        product_data: 商品更新データ
-        current_user: 現在のユーザー（認証済み）
-        product_service: 商品サービス
-        
-    Returns:
-        更新された商品
-        
-    Requires:
-        - 認証: 必須
-        - 権限: PRODUCT_UPDATE
-        
-    Raises:
-        NotFoundError: 商品が見つからない場合
-    """
+    # Decorator handles exceptions from service layer
     product = await product_service.update_product(
         product_id=product_id,
         product_data=product_data,
         updated_by=current_user.user_id
     )
-    
     if not product:
-        raise NotFoundError("Product")
+        raise APINotFoundError("Product") # Changed to APINotFoundError
     
     return product
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, summary="商品削除")
-@handle_exceptions("Failed to delete product")
+@handle_api_exceptions("Failed to delete product") # Renamed decorator
 async def delete_product(
     product_id: str = Path(..., description="商品ID"),
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_DELETE)),
     product_service: ProductService = Depends(get_product_service)
 ):
-    """
-    商品を削除
-    
-    Args:
-        product_id: 商品ID
-        current_user: 現在のユーザー（認証済み）
-        product_service: 商品サービス
-        
-    Requires:
-        - 認証: 必須
-        - 権限: PRODUCT_DELETE
-        
-    Raises:
-        NotFoundError: 商品が見つからない場合
-    """
+    # Decorator handles exceptions from service layer
     success = await product_service.delete_product(
         product_id=product_id,
         deleted_by=current_user.user_id
     )
-    
     if not success:
-        raise NotFoundError("Product")
+        raise APINotFoundError("Product") # Changed to APINotFoundError
 
 
 # === 商品検索エンドポイント ===
 
 @router.get("/search/advanced", response_model=List[Product], summary="高度な商品検索")
-@handle_exceptions("Failed to search products")
+@handle_api_exceptions("Failed to search products") # Renamed decorator
 async def advanced_product_search(
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_LIST)),
     product_service: ProductService = Depends(get_product_service),
@@ -312,7 +282,7 @@ async def advanced_product_search(
 # === 商品統計エンドポイント ===
 
 @router.get("/stats/overview", summary="商品統計概要")
-@handle_exceptions("Failed to get product statistics")
+@handle_api_exceptions("Failed to get product statistics") # Renamed decorator
 async def get_product_statistics(
     current_user: AuthUser = Depends(require_permission(Permission.ANALYTICS_READ)),
     product_service: ProductService = Depends(get_product_service)
@@ -346,7 +316,7 @@ async def get_product_statistics(
 # === 商品カテゴリエンドポイント ===
 
 @router.get("/categories", summary="商品カテゴリ一覧")
-@handle_exceptions("Failed to get product categories")
+@handle_api_exceptions("Failed to get product categories") # Renamed decorator
 async def get_product_categories(
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_READ)),
     product_service: ProductService = Depends(get_product_service)
@@ -375,7 +345,7 @@ async def get_product_categories(
 # === 商品在庫エンドポイント ===
 
 @router.get("/{product_id}/inventory", summary="商品在庫情報取得")
-@handle_exceptions("Failed to get product inventory")
+@handle_api_exceptions("Failed to get product inventory") # Renamed decorator
 async def get_product_inventory(
     product_id: str = Path(..., description="商品ID"),
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_READ)),
@@ -399,43 +369,27 @@ async def get_product_inventory(
     inventory = await product_service.get_product_inventory(product_id)
     
     if not inventory:
-        raise NotFoundError("Product inventory")
+        raise APINotFoundError("Product inventory") # Changed to APINotFoundError
     
     return inventory
 
 
 @router.put("/{product_id}/inventory", summary="商品在庫更新")
-@handle_exceptions("Failed to update product inventory")
+@handle_api_exceptions("Failed to update product inventory") # Renamed decorator
 async def update_product_inventory(
     product_id: str = Path(..., description="商品ID"),
     inventory_data: dict = ...,
     current_user: AuthUser = Depends(require_permission(Permission.PRODUCT_UPDATE)),
     product_service: ProductService = Depends(get_product_service)
 ):
-    """
-    商品在庫を更新
-    
-    Args:
-        product_id: 商品ID
-        inventory_data: 在庫データ
-        current_user: 現在のユーザー（認証済み）
-        product_service: 商品サービス
-        
-    Returns:
-        更新された在庫情報
-        
-    Requires:
-        - 認証: 必須
-        - 権限: PRODUCT_UPDATE
-    """
+    # Decorator handles exceptions from service layer
     inventory = await product_service.update_product_inventory(
         product_id=product_id,
         inventory_data=inventory_data,
         updated_by=current_user.user_id
     )
-    
     if not inventory:
-        raise NotFoundError("Product")
+        raise APINotFoundError("Product") # Changed to APINotFoundError
     
     return inventory
 
@@ -443,7 +397,7 @@ async def update_product_inventory(
 # === 商品レコメンデーションエンドポイント ===
 
 @router.get("/{product_id}/recommendations", summary="商品レコメンデーション")
-@handle_exceptions("Failed to get product recommendations")
+@handle_api_exceptions("Failed to get product recommendations") # Renamed decorator
 async def get_product_recommendations(
     product_id: str = Path(..., description="商品ID"),
     current_user: AuthUser = Depends(require_permission(Permission.RECOMMENDATION_READ)),

@@ -9,16 +9,21 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Path, status
 from fastapi.responses import JSONResponse
 
-from ....auth.dependencies import (
+from src.auth.dependencies import (
     get_current_active_user, require_permission, get_pagination_params, get_sort_params
 )
-from ....auth.permissions import Permission
-from ....auth.decorators import require_permissions, audit_log, rate_limit
-from ....auth.auth_service import AuthUser
-from ....data_models.crm_models import Customer, CustomerCreate, CustomerUpdate
-from ....services.customer_service import CustomerService
-from ....repositories.customer_repository import CustomerRepository
-from ...exceptions import NotFoundError, AuthorizationError, handle_exceptions
+from src.auth.permissions import Permission
+from src.auth.decorators import require_permissions, audit_log, rate_limit
+from src.auth.auth_service import AuthUser
+from src.data_models.crm_models import Customer, CustomerCreate, CustomerUpdate
+from src.services.customer_service import CustomerService
+from src.repositories.customer_repository import CustomerRepository
+from src.api.exceptions import ( # Updated imports
+    APINotFoundError,
+    APIAuthorizationError, # Assuming this might be used, though not explicitly in current code
+    handle_api_exceptions
+)
+# No longer importing core exceptions directly here if relying on decorator
 
 router = APIRouter()
 
@@ -35,7 +40,7 @@ def get_customer_service() -> CustomerService:
 # === 顧客CRUD エンドポイント ===
 
 @router.get("/", response_model=List[Customer], summary="顧客一覧取得")
-@handle_exceptions("Failed to get customers")
+@handle_api_exceptions("Failed to get customers") # Renamed decorator
 async def get_customers(
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_LIST)),
     customer_service: CustomerService = Depends(get_customer_service),
@@ -88,7 +93,7 @@ async def get_customers(
 
 
 @router.get("/{customer_id}", response_model=Customer, summary="顧客詳細取得")
-@handle_exceptions("Failed to get customer")
+@handle_api_exceptions("Failed to get customer") # Renamed decorator
 async def get_customer(
     customer_id: str = Path(..., description="顧客ID"),
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_READ)),
@@ -115,13 +120,13 @@ async def get_customer(
     customer = await customer_service.get_customer_by_id(customer_id)
     
     if not customer:
-        raise NotFoundError("Customer")
+        raise APINotFoundError("Customer") # Changed to APINotFoundError
     
     return customer
 
 
 @router.post("/", response_model=Customer, status_code=status.HTTP_201_CREATED, summary="顧客作成")
-@handle_exceptions("Failed to create customer")
+@handle_api_exceptions("Failed to create customer") # Renamed decorator
 async def create_customer(
     customer_data: CustomerCreate,
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_CREATE)),
@@ -151,79 +156,51 @@ async def create_customer(
 
 
 @router.put("/{customer_id}", response_model=Customer, summary="顧客更新")
-@handle_exceptions("Failed to update customer")
+@handle_api_exceptions("Failed to update customer") # Renamed decorator
 async def update_customer(
     customer_id: str = Path(..., description="顧客ID"),
     customer_data: CustomerUpdate = ...,
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_UPDATE)),
     customer_service: CustomerService = Depends(get_customer_service)
 ):
-    """
-    顧客情報を更新
-    
-    Args:
-        customer_id: 顧客ID
-        customer_data: 顧客更新データ
-        current_user: 現在のユーザー（認証済み）
-        customer_service: 顧客サービス
-        
-    Returns:
-        更新された顧客
-        
-    Requires:
-        - 認証: 必須
-        - 権限: CUSTOMER_UPDATE
-        
-    Raises:
-        NotFoundError: 顧客が見つからない場合
-    """
+    # Decorator handles exceptions from service layer
     customer = await customer_service.update_customer(
         customer_id=customer_id,
         customer_data=customer_data,
         updated_by=current_user.user_id
     )
-    
+    # Assuming service layer raises CoreNotFoundException if customer not found,
+    # which is then handled by @handle_api_exceptions.
+    # If service can return None for "not found", then explicit check is needed:
     if not customer:
-        raise NotFoundError("Customer")
+        raise APINotFoundError("Customer") # Changed to APINotFoundError
     
     return customer
 
 
 @router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT, summary="顧客削除")
-@handle_exceptions("Failed to delete customer")
+@handle_api_exceptions("Failed to delete customer") # Renamed decorator
 async def delete_customer(
     customer_id: str = Path(..., description="顧客ID"),
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_DELETE)),
     customer_service: CustomerService = Depends(get_customer_service)
 ):
-    """
-    顧客を削除
-    
-    Args:
-        customer_id: 顧客ID
-        current_user: 現在のユーザー（認証済み）
-        customer_service: 顧客サービス
-        
-    Requires:
-        - 認証: 必須
-        - 権限: CUSTOMER_DELETE
-        
-    Raises:
-        NotFoundError: 顧客が見つからない場合
-    """
+    # Decorator handles exceptions from service layer
     success = await customer_service.delete_customer(
         customer_id=customer_id,
         deleted_by=current_user.user_id
     )
-    
+    # Assuming service layer raises CoreNotFoundException if customer not found for deletion,
+    # or returns False and the decorator doesn't auto-raise for False.
+    # If service returns False for "not found":
     if not success:
-        raise NotFoundError("Customer")
+        raise APINotFoundError("Customer") # Changed to APINotFoundError
 
 
 # === 顧客検索エンドポイント ===
 
 @router.get("/search/advanced", response_model=List[Customer], summary="高度な顧客検索")
-@handle_exceptions("Failed to search customers")
+@handle_api_exceptions("Failed to search customers") # Renamed decorator
 async def advanced_customer_search(
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_LIST)),
     customer_service: CustomerService = Depends(get_customer_service),
@@ -292,7 +269,7 @@ async def advanced_customer_search(
 # === 顧客統計エンドポイント ===
 
 @router.get("/stats/overview", summary="顧客統計概要")
-@handle_exceptions("Failed to get customer statistics")
+@handle_api_exceptions("Failed to get customer statistics") # Renamed decorator
 async def get_customer_statistics(
     current_user: AuthUser = Depends(require_permission(Permission.ANALYTICS_READ)),
     customer_service: CustomerService = Depends(get_customer_service)
@@ -325,7 +302,7 @@ async def get_customer_statistics(
 # === 顧客セグメントエンドポイント ===
 
 @router.get("/{customer_id}/segment", summary="顧客セグメント取得")
-@handle_exceptions("Failed to get customer segment")
+@handle_api_exceptions("Failed to get customer segment") # Renamed decorator
 async def get_customer_segment(
     customer_id: str = Path(..., description="顧客ID"),
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_READ)),
@@ -349,42 +326,27 @@ async def get_customer_segment(
     segment = await customer_service.get_customer_segment(customer_id)
     
     if not segment:
-        raise NotFoundError("Customer segment")
+        raise APINotFoundError("Customer segment") # Changed to APINotFoundError
     
     return segment
 
 
 @router.put("/{customer_id}/segment", summary="顧客セグメント更新")
-@handle_exceptions("Failed to update customer segment")
+@handle_api_exceptions("Failed to update customer segment") # Renamed decorator
 async def update_customer_segment(
     customer_id: str = Path(..., description="顧客ID"),
     segment_data: dict = ...,
     current_user: AuthUser = Depends(require_permission(Permission.CUSTOMER_UPDATE)),
     customer_service: CustomerService = Depends(get_customer_service)
 ):
-    """
-    顧客セグメントを更新
-    
-    Args:
-        customer_id: 顧客ID
-        segment_data: セグメントデータ
-        current_user: 現在のユーザー（認証済み）
-        customer_service: 顧客サービス
-        
-    Returns:
-        更新されたセグメント情報
-        
-    Requires:
-        - 認証: 必須
-        - 権限: CUSTOMER_UPDATE
-    """
+    # Decorator handles exceptions from service layer
     segment = await customer_service.update_customer_segment(
         customer_id=customer_id,
         segment_data=segment_data,
         updated_by=current_user.user_id
     )
-    
+    # Assuming service layer raises CoreNotFoundException if customer not found
     if not segment:
-        raise NotFoundError("Customer")
+        raise APINotFoundError("Customer") # Changed to APINotFoundError
     
     return segment
