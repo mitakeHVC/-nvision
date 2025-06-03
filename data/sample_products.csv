@@ -1,0 +1,6 @@
+ProductID,ProductName,ProductDescription,SKU,CategoryID,CategoryName,SupplierID,Price,StockQuantity,ImagePath,DateAdded
+101,Laptop Pro 15,Powerful 15-inch laptop for professionals and creatives.,LP15-001,1,Electronics,201,1499.99,75,/images/lppro15.jpg,2023-01-10 10:00:00
+102,Wireless Mouse Ergonomic,Comfortable ergonomic wireless mouse with USB receiver.,WM-ERG-003,1,Electronics,202,29.50,250,/images/mouse_erg.jpg,2023-02-15 11:30:00
+103,Organic Green Tea,Premium quality organic green tea, 50 bags.,GT-ORG-50B,2,Groceries,12.99,300,/images/greentea.jpg,2023-03-01 09:15:00
+104,Advanced Python Programming Book,"In-depth guide to advanced Python concepts, 2nd Edition",BK-ADVPY-2E,3,Books,203,45.75,120,/images/pythonbook.jpg,2023-01-20 14:00:00
+105,Yoga Mat Premium,Eco-friendly non-slip yoga mat, 6mm thickness.,YM-PRM-6MM,4,Sports & Outdoors,39.95,90,/images/yogamat.jpg,2023-04-05 16:45:00

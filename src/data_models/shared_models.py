@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, PositiveInt, Field
+from pydantic import BaseModel, PositiveInt, Field, ConfigDict
 
 class ChatSession(BaseModel):
     ChatSessionID: PositiveInt = Field(..., alias='ChatSessionID')
@@ -11,8 +11,7 @@ class ChatSession(BaseModel):
     EndTime: Optional[datetime] = Field(None, alias='EndTime')
     Platform: Optional[str] = Field(None, alias='Platform') # e.g., Web, Mobile App
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class ChatMessage(BaseModel):
     ChatMessageID: PositiveInt = Field(..., alias='ChatMessageID')
@@ -24,8 +23,7 @@ class ChatMessage(BaseModel):
     ExtractedKeywords: Optional[List[str]] = Field(None, alias='ExtractedKeywords')
     ClassifiedTopics: Optional[List[str]] = Field(None, alias='ClassifiedTopics')
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 # Example Usage (optional, for testing):
 # if __name__ == "__main__":
