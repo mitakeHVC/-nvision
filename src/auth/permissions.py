@@ -67,6 +67,16 @@ class Permission(Enum):
     API_ACCESS = "api:access"
     API_ADMIN = "api:admin"
 
+    # Client Preferences Management
+    CLIENT_PREFERENCES_CREATE = "client_preferences:create"
+    CLIENT_PREFERENCES_READ = "client_preferences:read"
+    CLIENT_PREFERENCES_UPDATE = "client_preferences:update"
+    CLIENT_PREFERENCES_DELETE = "client_preferences:delete"
+
+    # Suggestion Engine Permissions
+    SUGGESTION_READ = "suggestion:read"
+    ACTION_PLAN_UPDATE = "action_plan:update" # Covers updating step status
+
 
 class Role(Enum):
     """システムロールの定義"""
@@ -252,6 +262,28 @@ class PermissionManager:
             "スーパー管理者",
             set(Permission)  # 全権限
         )
+
+        # Add new permissions to relevant roles, e.g., ADMIN and MANAGER
+        # For example, giving MANAGER all client preference permissions
+        if Role.MANAGER.value in self._role_definitions:
+            self._role_definitions[Role.MANAGER.value].permissions.update({
+                Permission.CLIENT_PREFERENCES_CREATE,
+                Permission.CLIENT_PREFERENCES_READ,
+                Permission.CLIENT_PREFERENCES_UPDATE,
+                Permission.CLIENT_PREFERENCES_DELETE,
+                Permission.SUGGESTION_READ,         # Manager can read suggestions
+                Permission.ACTION_PLAN_UPDATE,      # Manager can update action plans
+            })
+            logger.info(f"Client preference, suggestion, and action plan permissions added to role '{Role.MANAGER.value}'")
+
+        # Ensure ANALYST can read preferences and suggestions
+        if Role.ANALYST.value in self._role_definitions:
+             self._role_definitions[Role.ANALYST.value].permissions.update({
+                Permission.CLIENT_PREFERENCES_READ,
+                Permission.SUGGESTION_READ,         # Analyst can read suggestions
+                # ACTION_PLAN_UPDATE could be analyst or manager only, let's give to manager for now
+             })
+             logger.info(f"Client preference and suggestion read permissions added to role '{Role.ANALYST.value}'")
     
     def define_role(
         self,

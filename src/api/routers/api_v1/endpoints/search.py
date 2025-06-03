@@ -9,15 +9,15 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 
-from ....auth.dependencies import (
+from src.auth.dependencies import (
     get_current_active_user, require_permission, get_pagination_params
 )
-from ....auth.permissions import Permission
-from ....auth.decorators import require_permissions, audit_log, rate_limit
-from ....auth.auth_service import AuthUser
-from ....services.vector_search_service import VectorSearchService
-from ....repositories.vector_repository import VectorRepository
-from ...exceptions import ValidationError, handle_exceptions
+from src.auth.permissions import Permission
+from src.auth.decorators import require_permissions, audit_log, rate_limit
+from src.auth.auth_service import AuthUser
+from src.services.vector_search_service import VectorSearchService
+from src.repositories.vector_repository import VectorRepository
+from src.api.exceptions import APIValidationError, handle_api_exceptions # Updated imports
 
 router = APIRouter()
 
@@ -34,7 +34,7 @@ def get_vector_search_service() -> VectorSearchService:
 # === ベクトル検索エンドポイント ===
 
 @router.post("/vector", summary="ベクトル検索")
-@handle_exceptions("Vector search failed")
+@handle_api_exceptions("Vector search failed") # Renamed decorator
 async def vector_search(
     query: str = Query(..., description="検索クエリ"),
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_VECTOR)),
@@ -69,7 +69,7 @@ async def vector_search(
         ValidationError: クエリが無効な場合
     """
     if not query.strip():
-        raise ValidationError("Search query cannot be empty")
+        raise APIValidationError("Search query cannot be empty") # Changed to APIValidationError
     
     # ベクトル検索実行
     results = await vector_search_service.search(
@@ -96,7 +96,7 @@ async def vector_search(
 
 
 @router.post("/semantic", summary="セマンティック検索")
-@handle_exceptions("Semantic search failed")
+@handle_api_exceptions("Semantic search failed") # Renamed decorator
 async def semantic_search(
     query: str = Query(..., description="検索クエリ"),
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_SEMANTIC)),
@@ -131,7 +131,7 @@ async def semantic_search(
         ValidationError: クエリが無効な場合
     """
     if not query.strip():
-        raise ValidationError("Search query cannot be empty")
+        raise APIValidationError("Search query cannot be empty") # Changed to APIValidationError
     
     # セマンティック検索実行
     results = await vector_search_service.semantic_search(
@@ -160,7 +160,7 @@ async def semantic_search(
 
 
 @router.post("/advanced", summary="高度な検索")
-@handle_exceptions("Advanced search failed")
+@handle_api_exceptions("Advanced search failed") # Renamed decorator
 async def advanced_search(
     query: str = Query(..., description="検索クエリ"),
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_ADVANCED)),
@@ -199,7 +199,7 @@ async def advanced_search(
         ValidationError: パラメータが無効な場合
     """
     if not query.strip():
-        raise ValidationError("Search query cannot be empty")
+        raise APIValidationError("Search query cannot be empty") # Changed to APIValidationError
     
     # 高度な検索実行
     results = await vector_search_service.advanced_search(
@@ -242,7 +242,7 @@ async def advanced_search(
 # === 検索候補エンドポイント ===
 
 @router.get("/suggestions", summary="検索候補取得")
-@handle_exceptions("Failed to get search suggestions")
+@handle_api_exceptions("Failed to get search suggestions") # Renamed decorator
 async def get_search_suggestions(
     query: str = Query(..., description="検索クエリ", min_length=1),
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_VECTOR)),
@@ -282,7 +282,7 @@ async def get_search_suggestions(
 # === 検索履歴エンドポイント ===
 
 @router.get("/history", summary="検索履歴取得")
-@handle_exceptions("Failed to get search history")
+@handle_api_exceptions("Failed to get search history") # Renamed decorator
 async def get_search_history(
     current_user: AuthUser = Depends(get_current_active_user),
     vector_search_service: VectorSearchService = Depends(get_vector_search_service),
@@ -324,7 +324,7 @@ async def get_search_history(
 
 
 @router.delete("/history", summary="検索履歴削除")
-@handle_exceptions("Failed to clear search history")
+@handle_api_exceptions("Failed to clear search history") # Renamed decorator
 async def clear_search_history(
     current_user: AuthUser = Depends(get_current_active_user),
     vector_search_service: VectorSearchService = Depends(get_vector_search_service)
@@ -355,7 +355,7 @@ async def clear_search_history(
 # === 検索統計エンドポイント ===
 
 @router.get("/stats", summary="検索統計取得")
-@handle_exceptions("Failed to get search statistics")
+@handle_api_exceptions("Failed to get search statistics") # Renamed decorator
 async def get_search_statistics(
     current_user: AuthUser = Depends(require_permission(Permission.ANALYTICS_READ)),
     vector_search_service: VectorSearchService = Depends(get_vector_search_service),
@@ -393,7 +393,7 @@ async def get_search_statistics(
 # === コレクション管理エンドポイント ===
 
 @router.get("/collections", summary="コレクション一覧取得")
-@handle_exceptions("Failed to get collections")
+@handle_api_exceptions("Failed to get collections") # Renamed decorator
 async def get_collections(
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_VECTOR)),
     vector_search_service: VectorSearchService = Depends(get_vector_search_service)
@@ -420,7 +420,7 @@ async def get_collections(
 
 
 @router.get("/collections/{collection_name}/info", summary="コレクション情報取得")
-@handle_exceptions("Failed to get collection info")
+@handle_api_exceptions("Failed to get collection info") # Renamed decorator
 async def get_collection_info(
     collection_name: str,
     current_user: AuthUser = Depends(require_permission(Permission.SEARCH_VECTOR)),
@@ -444,7 +444,7 @@ async def get_collection_info(
     info = await vector_search_service.get_collection_info(collection_name)
     
     if not info:
-        raise ValidationError(f"Collection '{collection_name}' not found")
+        raise APIValidationError(f"Collection '{collection_name}' not found") # Changed to APIValidationError
     
     return {
         "collection_name": collection_name,
@@ -455,7 +455,7 @@ async def get_collection_info(
 # === 検索結果エクスポートエンドポイント ===
 
 @router.post("/export", summary="検索結果エクスポート")
-@handle_exceptions("Failed to export search results")
+@handle_api_exceptions("Failed to export search results") # Renamed decorator
 async def export_search_results(
     query: str = Query(..., description="検索クエリ"),
     current_user: AuthUser = Depends(require_permission(Permission.ANALYTICS_EXPORT)),

@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
 import json
 
-from ...src.api.main import app
-from ...src.auth.models import LoginRequest, UserCreate
-from ...src.models.user_models import User
+from src.api.main import app # Corrected import
+from src.auth.models import LoginRequest # Corrected import
+from src.models.user_models import User, UserCreate # Corrected import, UserCreate was missing from this import line
 
 
 class TestAuthEndpoints:

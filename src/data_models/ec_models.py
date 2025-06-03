@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, PositiveInt, NonNegativeInt, NonNegativeFloat
+from pydantic import BaseModel, EmailStr, Field, PositiveInt, NonNegativeInt, NonNegativeFloat, ConfigDict
 
 class Customer(BaseModel):
     CustomerID: PositiveInt = Field(..., alias='CustomerID')
@@ -24,6 +24,32 @@ class Product(BaseModel):
     StockQuantity: Optional[NonNegativeInt] = Field(None, alias='StockQuantity')
     ImagePath: Optional[str] = Field(None, alias='ImagePath')
     DateAdded: Optional[datetime] = Field(None, alias='DateAdded')
+
+class ProductCreate(BaseModel):
+    ProductName: str = Field(..., alias='ProductName') # Assuming ProductName is mandatory for creation
+    Description: Optional[str] = Field(None, alias='Description')
+    SKU: Optional[str] = Field(None, alias='SKU')
+    CategoryID: Optional[PositiveInt] = Field(None, alias='CategoryID')
+    SupplierID: Optional[PositiveInt] = Field(None, alias='SupplierID')
+    Price: NonNegativeFloat = Field(..., alias='Price') # Assuming Price is mandatory
+    StockQuantity: Optional[NonNegativeInt] = Field(0, alias='StockQuantity')
+    ImagePath: Optional[str] = Field(None, alias='ImagePath')
+    # ProductID and DateAdded will be set by the system
+
+    model_config = ConfigDict(populate_by_name=True)
+
+class ProductUpdate(BaseModel):
+    ProductName: Optional[str] = Field(None, alias='ProductName')
+    Description: Optional[str] = Field(None, alias='Description')
+    SKU: Optional[str] = Field(None, alias='SKU')
+    CategoryID: Optional[PositiveInt] = Field(None, alias='CategoryID')
+    SupplierID: Optional[PositiveInt] = Field(None, alias='SupplierID')
+    Price: Optional[NonNegativeFloat] = Field(None, alias='Price')
+    StockQuantity: Optional[NonNegativeInt] = Field(None, alias='StockQuantity')
+    ImagePath: Optional[str] = Field(None, alias='ImagePath')
+    # LastUpdated will be handled by the system
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class Category(BaseModel):
     CategoryID: PositiveInt = Field(..., alias='CategoryID')
@@ -63,6 +89,8 @@ class CustomerReview(BaseModel):
     ReviewDate: Optional[datetime] = Field(None, alias='ReviewDate')
     SentimentScore: Optional[float] = Field(None, alias='SentimentScore') # Numerical score
     SentimentLabel: Optional[str] = Field(None, alias='SentimentLabel') # E.g., Positive, Negative
+
+    model_config = ConfigDict(populate_by_name=True) # Added missing model_config
 
 # Example usage (optional, for testing purposes):
 # if __name__ == "__main__":
