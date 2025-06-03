@@ -7,7 +7,8 @@ JWT設定、セキュリティ設定、認証設定を管理します。
 import os
 import secrets
 from typing import Optional, List
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 from datetime import timedelta
 
 
@@ -196,28 +197,32 @@ class AuthSettings(BaseSettings):
         description="レート制限を無効にするか（開発用）"
     )
     
-    @validator('jwt_secret_key')
+    @field_validator('jwt_secret_key')
+    @classmethod
     def validate_jwt_secret_key(cls, v):
         if len(v) < 32:
             raise ValueError('JWT secret key must be at least 32 characters long')
         return v
     
-    @validator('password_min_length')
+    @field_validator('password_min_length')
+    @classmethod
     def validate_password_min_length(cls, v):
         if v < 6:
             raise ValueError('Password minimum length must be at least 6')
         return v
     
-    @validator('password_hash_rounds')
+    @field_validator('password_hash_rounds')
+    @classmethod
     def validate_password_hash_rounds(cls, v):
         if v < 10 or v > 15:
             raise ValueError('Password hash rounds must be between 10 and 15')
         return v
     
-    class Config:
-        env_prefix = "AUTH_"
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_prefix": "AUTH_",
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 class SecuritySettings(BaseSettings):
@@ -295,10 +300,11 @@ class SecuritySettings(BaseSettings):
         description="GDPR準拠を有効にするか"
     )
     
-    class Config:
-        env_prefix = "SECURITY_"
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_prefix": "SECURITY_",
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 class DatabaseSettings(BaseSettings):
@@ -332,10 +338,11 @@ class DatabaseSettings(BaseSettings):
         description="キャッシュ用Redisデータベース番号"
     )
     
-    class Config:
-        env_prefix = "AUTH_DB_"
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_prefix": "AUTH_DB_",
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 class EmailSettings(BaseSettings):
@@ -379,10 +386,11 @@ class EmailSettings(BaseSettings):
         description="メールテンプレートディレクトリ"
     )
     
-    class Config:
-        env_prefix = "EMAIL_"
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_prefix": "EMAIL_",
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 # 設定インスタンス

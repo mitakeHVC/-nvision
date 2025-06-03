@@ -14,6 +14,10 @@ passlib[bcrypt]==1.7.4
 # Database Dependencies
 neo4j==5.15.0
 chromadb==0.4.18
+redis==5.0.1
+
+# System Monitoring
+psutil==5.9.6
 
 # AI/ML Dependencies
 sentence-transformers==2.2.2
